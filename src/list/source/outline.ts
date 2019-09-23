@@ -69,12 +69,12 @@ export default class Outline extends LocationList {
   public doHighlight(): void {
     let { nvim } = this
     nvim.pauseNotification()
-    nvim.command('syntax match CocOutlineName /\\v^\\s*[^\t]+/ contained containedin=CocOutlineLine', true)
+    nvim.command('syntax match CocOutlineName /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=CocOutlineLine', true);
     nvim.command('syntax match CocOutlineKind /\\[\\w\\+\\]/ contained containedin=CocOutlineLine', true)
-    nvim.command('syntax match CocOutlineLine /\\d\\+$/ contained containedin=CocOutlineLine', true)
-    nvim.command('highlight default link CocOutlineName Normal', true)
+    nvim.command('syntax match CocOutlineLineNr /\\d\\+$/ contained containedin=CocOutlineLine', true)
+    nvim.command('highlight default link CocOutlineName None', true);
     nvim.command('highlight default link CocOutlineKind Typedef', true)
-    nvim.command('highlight default link CocOutlineLine Comment', true)
+    nvim.command('highlight default link CocOutlineLineNr Comment', true)
     nvim.resumeNotification().catch(_e => {
       // noop
     })
@@ -108,7 +108,7 @@ export default class Outline extends LocationList {
       if (!text) continue
       let idx = text.indexOf(parts[0])
       let start = idx == -1 ? 0 : idx
-      let range: Range = Range.create(lnum - 1, start, lnum - 1, start + parts[0].length)
+      let range: Range = Range.create(lnum - 2, start, lnum - 1, start + parts[0].length)
       items.push({
         label: `${parts[0]} [${parts[3]}] ${lnum}`,
         filterText: parts[0],

@@ -1,13 +1,13 @@
 import path from 'path'
-import { SymbolInformation, SymbolKind } from 'vscode-languageserver-types'
-import { URI } from 'vscode-uri'
+import {SymbolInformation, SymbolKind} from 'vscode-languageserver-types'
+import {URI} from 'vscode-uri'
 import languages from '../../languages'
-import { ListContext, ListItem } from '../../types'
+import {ListContext, ListItem} from '../../types'
 import workspace from '../../workspace'
 import LocationList from './location'
-import { getSymbolKind } from '../../util/convert'
-import { isParentFolder } from '../../util/fs'
-import { score } from '../../util/fzy'
+import {getSymbolKind} from '../../util/convert'
+import {isParentFolder} from '../../util/fs'
+import {score} from '../../util/fzy'
 const logger = require('../../util/logger')('list-symbols')
 
 export default class Symbols extends LocationList {
@@ -20,7 +20,7 @@ export default class Symbols extends LocationList {
     let buf = await context.window.buffer
     let document = workspace.getDocument(buf.id)
     if (!document) return null
-    let { input } = context
+    let {input} = context
     if (!context.options.interactive) {
       throw new Error('Symbols only works on interactive mode')
     }
@@ -39,7 +39,7 @@ export default class Symbols extends LocationList {
         label: `${s.name} [${kind}]\t${file}`,
         filterText: `${s.name}`,
         location: s.location,
-        data: { original: s, kind: s.kind, file, score: score(input, s.name) }
+        data: {original: s, kind: s.kind, file, score: score(input, s.name)}
       })
     }
     items.sort((a, b) => {
@@ -72,12 +72,12 @@ export default class Symbols extends LocationList {
   }
 
   public doHighlight(): void {
-    let { nvim } = this
+    let {nvim} = this
     nvim.pauseNotification()
-    nvim.command('syntax match CocSymbolsName /\\v^\\s*\\S+/ contained containedin=CocSymbolsLine', true)
+    nvim.command('syntax match CocSymbolsName /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=CocSymbolsLine', true);
     nvim.command('syntax match CocSymbolsKind /\\[\\w\\+\\]\\t/ contained containedin=CocSymbolsLine', true)
     nvim.command('syntax match CocSymbolsFile /\\S\\+$/ contained containedin=CocSymbolsLine', true)
-    nvim.command('highlight default link CocSymbolsName Normal', true)
+    nvim.command('highlight default link CocSymbolsName None', true)
     nvim.command('highlight default link CocSymbolsKind Typedef', true)
     nvim.command('highlight default link CocSymbolsFile Comment', true)
     nvim.resumeNotification().catch(_e => {
