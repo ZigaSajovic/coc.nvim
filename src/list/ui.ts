@@ -434,7 +434,7 @@ export default class ListUI {
       if (highlight) {
         let { spans, hlGroup } = highlight
         for (let span of spans) {
-          nvim.call('matchaddpos', [hlGroup || 'Search', [[i + 1, span[0] + 1, span[1] - span[0]]], 11], true)
+          nvim.call('matchaddpos', [hlGroup || 'Statement', [[i + 1, span[0] + 1, span[1] - span[0]]], 11], true)
         }
       }
     }
