@@ -698,6 +698,11 @@
       "default": "Search",
       "description": "Highlight group used for highlight the range in preview window."
     },
+    "list.searchHighlightGroup":{
+      "type": "string",
+      "default": "Search",
+      "description": "Highlight group used for highlighr the matched charachters."
+    },
     "list.nextKeymap": {
       "type": "string",
       "default": "<C-j>",

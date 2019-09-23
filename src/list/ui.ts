@@ -422,6 +422,7 @@ export default class ListUI {
   private doHighlight(start: number, end: number): void {
     let { nvim } = workspace
     let { highlights, items } = this
+    let searchHighlightGroup = this.config.get<string>('searchHighlightGroup', 'Search')
     for (let i = start; i <= Math.min(end, items.length - 1); i++) {
       let { ansiHighlights } = items[i]
       let highlight = highlights[i]
@@ -434,7 +435,7 @@ export default class ListUI {
       if (highlight) {
         let { spans, hlGroup } = highlight
         for (let span of spans) {
-          nvim.call('matchaddpos', [hlGroup || 'Statement', [[i + 1, span[0] + 1, span[1] - span[0]]], 11], true)
+          nvim.call('matchaddpos', [hlGroup || searchHighlightGroup, [[i + 1, span[0] + 1, span[1] - span[0]]], 11], true)
         }
       }
     }
