@@ -222,6 +222,7 @@ function! coc#list#setup(source)
   setl tabstop=1 nolist nocursorcolumn
   setl signcolumn=auto
   setl filetype=list
+  setl nospell
   syntax case ignore
   let source = a:source[8:]
   let name = toupper(source[0]).source[1:]
