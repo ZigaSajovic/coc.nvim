@@ -450,6 +450,14 @@
       },
       "additionalProperties": false
     },
+    "suggest.invalidInsertCharacters": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Invalid character for strip valid word when inserting text of complete item.",
+      "default": [" ", "(", "<", "{", "[", "\r", "\n"]
+    },
     "diagnostic.enable": {
       "type": "boolean",
       "description": "Set to false to disable diagnostic display",
@@ -811,8 +819,7 @@
     "coc.preferences.jumpCommand": {
       "type": "string",
       "description": "Command used for location jump, like goto definition, goto references etc.",
-      "default": "edit",
-      "enum": ["edit", "split", "vsplit", "tabe", "drop", "tab drop"]
+      "default": "edit"
     },
     "coc.preferences.messageLevel": {
       "type": "string",
