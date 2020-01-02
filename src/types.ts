@@ -337,7 +337,7 @@ export interface LanguageServerConfig {
   enable: boolean
   args?: string[]
   cwd?: string
-  env?: string[]
+  env?: any
   // socket port
   port?: number
   host?: string
@@ -562,6 +562,7 @@ export interface CompleteResult {
 
 export interface SourceStat {
   name: string
+  priority: number
   type: string
   shortcut: string
   filepath: string
@@ -593,6 +594,7 @@ export interface CompleteConfig {
   highPrioritySourceLimit: number
   lowPrioritySourceLimit: number
   removeDuplicateItems: boolean
+  defaultSortMethod: string
 }
 
 export interface WorkspaceConfiguration {

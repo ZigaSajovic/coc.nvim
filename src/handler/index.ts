@@ -63,6 +63,7 @@ interface Preferences {
   triggerSignatureHelp: boolean
   triggerSignatureWait: number
   formatOnType: boolean
+  formatOnInsertLeave: boolean
   hoverTarget: string
   previewAutoClose: boolean
   bracketEnterImprove: boolean
@@ -146,6 +147,7 @@ export default class Handler {
         let line = (await nvim.call('line', '.') as number) - 1
         let doc = workspace.getDocument(bufnr)
         if (!doc) return
+        await doc.checkDocument()
         let pre = doc.getline(line - 1)
         let curr = doc.getline(line)
         let prevChar = pre[pre.length - 1]
@@ -202,6 +204,7 @@ export default class Handler {
     }, null, this.disposables)
 
     events.on('InsertLeave', async bufnr => {
+      if (!this.preferences.formatOnInsertLeave) return
       await wait(30)
       if (workspace.insertMode) return
       await this.onCharacterType('\n', bufnr, true)
@@ -253,7 +256,7 @@ export default class Handler {
         await this.applyCodeAction(actions[0])
         return true
       }
-      workspace.showMessage(`Orgnize import action not found.`, 'warning')
+      workspace.showMessage(`Organize import action not found.`, 'warning')
       return false
     }))
     commandManager.titles.set('editor.action.organizeImport', 'run organize import code action.')
@@ -691,6 +694,13 @@ export default class Handler {
     await this.documentHighlighter.highlight(bufnr)
   }
 
+  public async getSymbolsRanges(): Promise<Range[]> {
+    let document = await workspace.document
+    let highlights = await this.documentHighlighter.getHighlights(document)
+    if (!highlights) return null
+    return highlights.map(o => o.range)
+  }
+
   public async links(): Promise<DocumentLink[]> {
     let doc = await workspace.document
     let links = await languages.getDocumentLinks(doc.textDocument)
@@ -800,11 +810,11 @@ export default class Handler {
       doc.forceSync()
       await wait(50)
     }
-    let pos: Position = insertLeave ? { line: position.line + 1, character: 0 } : position
+    let pos: Position = insertLeave ? { line: position.line, character: origLine.length } : position
     try {
       let edits = await languages.provideDocumentOnTypeEdits(ch, doc.textDocument, pos)
       // changed by other process
-      if (doc.changedtick != changedtick) return
+      if (doc.changedtick != changedtick || edits == null) return
       if (insertLeave) {
         edits = edits.filter(edit => {
           return edit.range.start.line < position.line + 1
@@ -1201,6 +1211,7 @@ export default class Handler {
       signatureFloatMaxWidth: signatureConfig.get<number>('floatMaxWidth', 80),
       signatureHideOnChange: signatureConfig.get<boolean>('hideOnTextChange', false),
       formatOnType: config.get<boolean>('formatOnType', false),
+      formatOnInsertLeave: config.get<boolean>('formatOnInsertLeave', false),
       bracketEnterImprove: config.get<boolean>('bracketEnterImprove', true),
       previewAutoClose: config.get<boolean>('previewAutoClose', false),
       currentFunctionSymbolAutoUpdate: config.get<boolean>('currentFunctionSymbolAutoUpdate', false),

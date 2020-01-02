@@ -11,8 +11,9 @@ const logger = require('../util/logger')('model-fetch')
 export function getAgent(endpoint: UrlWithStringQuery): Agent {
   let proxy = workspace.getConfiguration('http').get<string>('proxy', '')
   let key = endpoint.protocol.startsWith('https') ? 'HTTPS_PROXY' : 'HTTP_PROXY'
-  if (!proxy && process.env[key]) {
-    proxy = process.env[key].replace(/^https?:\/\//, '').replace(/\/$/, '')
+  let env = process.env[key] || process.env[key.toLowerCase()]
+  if (!proxy && env) {
+    proxy = env
   }
   const noProxy = process.env.NO_PROXY || process.env.no_proxy || null
   if (noProxy === '*') {
@@ -45,6 +46,7 @@ export function getAgent(endpoint: UrlWithStringQuery): Agent {
     }
   }
   if (proxy) {
+    proxy = proxy.replace(/^https?:\/\//, '').replace(/\/$/, '')
     let auth = proxy.includes('@') ? proxy.split('@', 2)[0] : ''
     let parts = auth.length ? proxy.slice(auth.length + 1).split(':') : proxy.split(':')
     logger.info(`Using proxy from: ${proxy}`)

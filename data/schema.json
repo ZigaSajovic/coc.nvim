@@ -108,7 +108,7 @@
     },
     "languageServerSocket": {
       "type": "object",
-      "allOf": [{"$ref": "#/definitions/languageServerBase"}],
+      "allOf": [{ "$ref": "#/definitions/languageServerBase" }],
       "required": ["port", "filetypes"],
       "additionalProperties": false,
       "properties": {
@@ -140,7 +140,7 @@
     },
     "languageServerModule": {
       "type": "object",
-      "allOf": [{"$ref": "#/definitions/languageServerBase"}],
+      "allOf": [{ "$ref": "#/definitions/languageServerBase" }],
       "required": ["module", "filetypes"],
       "additionalProperties": false,
       "properties": {
@@ -202,7 +202,7 @@
     "languageServerCommand": {
       "type": "object",
       "required": ["command", "filetypes"],
-      "allOf": [{"$ref": "#/definitions/languageServerBase"}],
+      "allOf": [{ "$ref": "#/definitions/languageServerBase" }],
       "additionalProperties": false,
       "properties": {
         "command": {
@@ -416,37 +416,43 @@
       "description": "Remove completion items with duplicated word for all sources, snippet items are excluded.",
       "default": false
     },
+    "suggest.defaultSortMethod": {
+      "type": "string",
+      "description": "Default sorting behavior for suggested completion items.",
+      "default": "length",
+      "enum": ["length", "alphabetical"]
+    },
     "suggest.completionItemKindLabels": {
       "type": "object",
       "default": {},
       "description": "Set custom labels to completion items' kinds.",
       "properties": {
-        "text": {"type": "string"},
-        "method": {"type": "string"},
-        "function": {"type": "string"},
-        "constructor": {"type": "string"},
-        "field": {"type": "string"},
-        "variable": {"type": "string"},
-        "class": {"type": "string"},
-        "interface": {"type": "string"},
-        "module": {"type": "string"},
-        "property": {"type": "string"},
-        "unit": {"type": "string"},
-        "value": {"type": "string"},
-        "enum": {"type": "string"},
-        "keyword": {"type": "string"},
-        "snippet": {"type": "string"},
-        "color": {"type": "string"},
-        "file": {"type": "string"},
-        "reference": {"type": "string"},
-        "folder": {"type": "string"},
-        "enumMember": {"type": "string"},
-        "constant": {"type": "string"},
-        "struct": {"type": "string"},
-        "event": {"type": "string"},
-        "operator": {"type": "string"},
-        "typeParameter": {"type": "string"},
-        "default": {"type": "string"}
+        "text": { "type": "string" },
+        "method": { "type": "string" },
+        "function": { "type": "string" },
+        "constructor": { "type": "string" },
+        "field": { "type": "string" },
+        "variable": { "type": "string" },
+        "class": { "type": "string" },
+        "interface": { "type": "string" },
+        "module": { "type": "string" },
+        "property": { "type": "string" },
+        "unit": { "type": "string" },
+        "value": { "type": "string" },
+        "enum": { "type": "string" },
+        "keyword": { "type": "string" },
+        "snippet": { "type": "string" },
+        "color": { "type": "string" },
+        "file": { "type": "string" },
+        "reference": { "type": "string" },
+        "folder": { "type": "string" },
+        "enumMember": { "type": "string" },
+        "constant": { "type": "string" },
+        "struct": { "type": "string" },
+        "event": { "type": "string" },
+        "operator": { "type": "string" },
+        "typeParameter": { "type": "string" },
+        "default": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -803,6 +809,11 @@
         "type": "string"
       }
     },
+    "coc.preferences.formatOnInsertLeave": {
+      "type": "boolean",
+      "description": "Trigger format on type when insert leave by send \n to the server.",
+      "default": false
+    },
     "coc.preferences.enableFloatHighlight": {
       "type": "boolean",
       "description": "Enable highlight for floating window.",
@@ -841,6 +852,13 @@
       "type": "boolean",
       "description": "Set to true to enable format on type",
       "default": false
+    },
+    "coc.preferences.highlightTimeout": {
+      "type": "integer",
+      "default": 500,
+      "minimum": 200,
+      "maximum": 5000,
+      "description": "Highlight timeout for buffer in floating window."
     },
     "coc.preferences.snippets.enable": {
       "type": "boolean",

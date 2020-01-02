@@ -23,7 +23,7 @@ import WillSaveUntilHandler from './model/willSaveHandler'
 import { TextDocumentContentProvider } from './provider'
 import { Autocmd, ConfigurationChangeEvent, ConfigurationTarget, EditerState, Env, IWorkspace, KeymapOption, LanguageServerConfig, MapMode, MessageLevel, MsgTypes, OutputChannel, PatternType, QuickfixItem, StatusBarItem, StatusItemOption, Terminal, TerminalOptions, TerminalResult, TextDocumentWillSaveEvent, WorkspaceConfiguration, DidChangeTextDocumentParams } from './types'
 import { distinct } from './util/array'
-import { findUp, isFile, isParentFolder, readFile, readFileLine, renameAsync, resolveRoot, statAsync, writeFile } from './util/fs'
+import { findUp, isFile, isParentFolder, readFile, readFileLine, renameAsync, resolveRoot, statAsync, writeFile, fixDriver } from './util/fs'
 import { disposeAll, echoErr, echoMessage, echoWarning, getKeymapModifier, isDocumentEdit, mkdirp, runCommand, wait, platform } from './util/index'
 import { score } from './util/match'
 import { getChangedFromEdits } from './util/position'
@@ -375,7 +375,7 @@ export class Workspace implements IWorkspace {
     let filepath = await this.nvim.call('expand', '%:p') as string
     filepath = path.normalize(filepath)
     let isFile = filepath && path.isAbsolute(filepath)
-    if (isFile && !isParentFolder(cwd, filepath)) {
+    if (isFile && !isParentFolder(cwd, filepath, true)) {
       // can't use cwd
       return findUp(filename, path.dirname(filepath))
     }
@@ -610,7 +610,7 @@ export class Workspace implements IWorkspace {
    */
   public async showLocations(locations: Location[]): Promise<void> {
     let items = await Promise.all(locations.map(loc => {
-      return this.getQuickfixItem(loc, '', undefined, 'Locations')
+      return this.getQuickfixItem(loc)
     }))
     let { nvim } = this
     const preferences = this.getConfiguration('coc.preferences')
@@ -643,7 +643,7 @@ export class Workspace implements IWorkspace {
   public getWorkspaceFolder(uri: string): WorkspaceFolder | null {
     this.workspaceFolders.sort((a, b) => b.uri.length - a.uri.length)
     let filepath = URI.parse(uri).fsPath
-    return this.workspaceFolders.find(folder => isParentFolder(URI.parse(folder.uri).fsPath, filepath))
+    return this.workspaceFolders.find(folder => isParentFolder(URI.parse(folder.uri).fsPath, filepath, true))
   }
 
   /**
@@ -782,21 +782,28 @@ export class Workspace implements IWorkspace {
     const preferences = this.getConfiguration('coc.preferences')
     let jumpCommand = openCommand || preferences.get<string>('jumpCommand', 'edit')
     let { nvim } = this
-    let { line, character } = position || { line: 0, character: 0 }
     let doc = this.getDocument(uri)
-    let col = character + 1
-    if (doc) col = byteLength(doc.getline(line).slice(0, character)) + 1
     let bufnr = doc ? doc.bufnr : -1
     await nvim.command(`normal! m'`)
-    if (bufnr == this.bufnr && position && jumpCommand == 'edit') {
-      await nvim.call('cursor', [line + 1, col])
+    if (bufnr == this.bufnr && jumpCommand == 'edit') {
+      if (position) await this.moveTo(position)
     } else if (bufnr != -1 && jumpCommand == 'edit') {
-      let moveCmd = position ? `+call\\ cursor(${line + 1},${col})` : ''
+      let moveCmd = ''
+      if (position) {
+        let line = doc.getline(position.line)
+        let col = byteLength(line.slice(0, position.character)) + 1
+        moveCmd = position ? `+call\\ cursor(${position.line + 1},${col})` : ''
+      }
       await this.nvim.call('coc#util#execute', [`buffer ${moveCmd} ${bufnr}`])
     } else {
-      let bufname = uri.startsWith('file:') ? path.normalize(URI.parse(uri).fsPath) : uri
-      let pos = position ? [line + 1, col] : []
-      await this.nvim.call('coc#util#jump', [jumpCommand, bufname, pos])
+      let { fsPath, scheme } = URI.parse(uri)
+      let pos = position == null ? null : [position.line + 1, position.character + 1]
+      if (scheme == 'file') {
+        let bufname = fixDriver(path.normalize(fsPath))
+        await this.nvim.call('coc#util#jump', [jumpCommand, bufname, pos])
+      } else {
+        await this.nvim.call('coc#util#jump', [jumpCommand, uri, pos])
+      }
     }
   }
 
@@ -1099,7 +1106,7 @@ export class Workspace implements IWorkspace {
         nvim.command(`inoremap ${silent}<expr> <Plug>(coc-${key}) coc#_insert_key('${method}', '${key}', ${opts.cancel ? 1 : 0})`, true)
       } else {
         let modify = getKeymapModifier(m)
-        nvim.command(`${m}noremap ${silent} <Plug>(coc-${key}) ${modify}:<c-u>call coc#rpc#${method}('doKeymap', ['${key}'])<cr>`, true)
+        nvim.command(`${m}noremap ${silent} <Plug>(coc-${key}) :${modify}call coc#rpc#${method}('doKeymap', ['${key}'])<cr>`, true)
       }
     }
     return Disposable.create(() => {
@@ -1132,7 +1139,8 @@ export class Workspace implements IWorkspace {
     let id = uuid()
     let { nvim } = this
     this.keymaps.set(id, [fn, false])
-    nvim.command(`${mode}noremap <silent><nowait><buffer> ${key} :<c-u>call coc#rpc#${notify ? 'notify' : 'request'}('doKeymap', ['${id}'])<CR>`, true)
+    let modify = getKeymapModifier(mode)
+    nvim.command(`${mode}noremap <silent><nowait><buffer> ${key} :${modify}call coc#rpc#${notify ? 'notify' : 'request'}('doKeymap', ['${id}'])<CR>`, true)
     return Disposable.create(() => {
       this.keymaps.delete(id)
       nvim.command(`${mode}unmap <buffer> ${key}`, true)
@@ -1332,27 +1340,30 @@ augroup end`
     let bufnr = buffer.id
     if (this.creatingSources.has(bufnr)) return
     let document = this.getDocument(bufnr)
+    let source = new CancellationTokenSource()
     try {
       if (document) this.onBufUnload(bufnr, true).logError()
       document = new Document(buffer, this._env)
-      let source = new CancellationTokenSource()
       let token = source.token
       this.creatingSources.set(bufnr, source)
       let created = await document.init(this.nvim, token)
-      if (!created || document.getVar<number>('enabled', 1) === 0) document = null
-      if (this.creatingSources.get(bufnr) == source) {
-        source.dispose()
-        this.creatingSources.delete(bufnr)
-      }
+      if (!created) document = null
     } catch (e) {
       logger.error('Error on create buffer:', e)
+      document = null
+    }
+    if (this.creatingSources.get(bufnr) == source) {
+      source.dispose()
+      this.creatingSources.delete(bufnr)
     }
     if (!document || !document.textDocument) return
     this.buffers.set(bufnr, document)
-    document.onDocumentDetach(uri => {
-      let doc = this.getDocument(uri)
-      if (doc) this.onBufUnload(doc.bufnr).logError()
-    })
+    if (document.enabled) {
+      document.onDocumentDetach(uri => {
+        let doc = this.getDocument(uri)
+        if (doc) this.onBufUnload(doc.bufnr).logError()
+      })
+    }
     if (document.buftype == '' && document.schema == 'file') {
       let config = this.getConfiguration('workspace')
       let filetypes = config.get<string[]>('ignoredFiletypes', [])
@@ -1367,8 +1378,10 @@ augroup end`
       }
       this.configurations.checkFolderConfiguration(document.uri)
     }
-    this._onDidOpenDocument.fire(document.textDocument)
-    document.onDocumentChange(e => this._onDidChangeDocument.fire(e))
+    if (document.enabled) {
+      this._onDidOpenDocument.fire(document.textDocument)
+      document.onDocumentChange(e => this._onDidChangeDocument.fire(e))
+    }
     logger.debug('buffer created', buffer.id)
   }
 
@@ -1459,14 +1472,15 @@ augroup end`
     let types = [PatternType.Buffer, PatternType.LanguageServer, PatternType.Global]
     let u = URI.parse(document.uri)
     let dir = path.dirname(u.fsPath)
+    let { cwd } = this
     for (let patternType of types) {
       let patterns = this.getRootPatterns(document, patternType)
       if (patterns && patterns.length) {
-        let root = resolveRoot(dir, patterns, this.cwd)
+        let root = resolveRoot(dir, patterns, cwd)
         if (root) return root
       }
     }
-    if (this.cwd != os.homedir() && isParentFolder(this.cwd, dir)) return this.cwd
+    if (this.cwd != os.homedir() && isParentFolder(this.cwd, dir, true)) return this.cwd
     return null
   }
 
@@ -1506,8 +1520,13 @@ augroup end`
     let filepath = isParentFolder(cwd, newPath) ? path.relative(cwd, newPath) : newPath
     let cursor = await nvim.call('getcurpos')
     nvim.pauseNotification()
-    nvim.command(`keepalt ${bufnr}bwipeout!`, true)
-    nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+    if (oldPath.toLowerCase() == newPath.toLowerCase()) {
+      nvim.command(`keepalt ${bufnr}bwipeout!`, true)
+      nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+    } else {
+      nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+      nvim.command(`${bufnr}bwipeout!`, true)
+    }
     if (!exists && lines.join('\n') != '\n') {
       nvim.call('append', [0, lines], true)
       nvim.command('normal! Gdd', true)
@@ -1553,6 +1572,11 @@ augroup end`
 
   public get folderPaths(): string[] {
     return this.workspaceFolders.map(f => URI.parse(f.uri).fsPath)
+  }
+
+  public get floatSupported(): boolean {
+    let { env } = this
+    return env.floating || env.textprop
   }
 
   public removeWorkspaceFolder(fsPath: string): void {

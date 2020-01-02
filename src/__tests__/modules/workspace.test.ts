@@ -436,6 +436,11 @@ describe('workspace methods', () => {
 
 describe('workspace utility', () => {
 
+  it('should support float', async () => {
+    let floatSupported = workspace.floatSupported
+    expect(floatSupported).toBe(true)
+  })
+
   it('should loadFile', async () => {
     let doc = await helper.createDocument()
     let newFile = URI.file(path.join(__dirname, 'abc')).toString()
@@ -1015,7 +1020,7 @@ describe('workspace private', () => {
     expect(attached).toBe(false)
     let doc = workspace.getDocument(buf.id)
       ; (doc as any).env.isVim = true
-      ; (workspace as any).initVimEvents()
+      ; (workspace as any).attachChangedEvents()
     await nvim.setLine('abc')
     await helper.wait(300)
     expect(doc.content).toMatch('abc')

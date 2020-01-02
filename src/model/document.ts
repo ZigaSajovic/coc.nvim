@@ -64,8 +64,13 @@ export default class Document {
    */
   public get shouldAttach(): boolean {
     let { buftype } = this
+    if (!this.getVar('enabled', true)) return false
     if (this.uri.endsWith('%5BCommand%20Line%5D')) return true
     return buftype == '' || buftype == 'acwrite'
+  }
+
+  public get enabled(): boolean {
+    return this.getVar('enabled', true)
   }
 
   /**
@@ -124,9 +129,7 @@ export default class Document {
     this._changedtick = opts.changedtick
     this.eol = opts.eol == 1
     let uri = this._uri = getUri(opts.fullpath, buffer.id, buftype, this.env.isCygwin)
-    token.onCancellationRequested(() => {
-      this.detach()
-    })
+    if (token.isCancellationRequested) return false
     try {
       if (!this.env.isVim) {
         let res = await this.attach()
@@ -143,7 +146,10 @@ export default class Document {
     this.textDocument = TextDocument.create(uri, this.filetype, 1, this.getDocumentContent())
     this.setIskeyword(opts.iskeyword)
     this.gitCheck()
-    if (token.isCancellationRequested) return false
+    if (token.isCancellationRequested) {
+      this.detach()
+      return false
+    }
     return true
   }
 
@@ -701,7 +707,8 @@ export default class Document {
         chars.addKeyword(ch)
       }
     }
-    this._words = this.chars.matchKeywords(this.lines.join('\n'))
+    let lines = this.lines.length > 30000 ? this.lines.slice(0, 30000) : this.lines
+    this._words = this.chars.matchKeywords(lines.join('\n'))
   }
 
   /**

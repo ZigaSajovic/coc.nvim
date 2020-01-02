@@ -164,7 +164,7 @@ export default class Configurations {
         if (u.scheme !== 'file') return changed.indexOf(section) !== -1
         let filepath = u.fsPath
         let preRoot = workspaceConfigFile ? path.resolve(workspaceConfigFile, '../..') : ''
-        if (configFile && !isParentFolder(preRoot, filepath) && !isParentFolder(path.resolve(configFile, '../..'), filepath)) {
+        if (configFile && !isParentFolder(preRoot, filepath, true) && !isParentFolder(path.resolve(configFile, '../..'), filepath)) {
           return false
         }
         return changed.indexOf(section) !== -1
@@ -178,7 +178,7 @@ export default class Configurations {
     let filepath = u.fsPath
     for (let [configFile, model] of this.foldConfigurations) {
       let root = path.resolve(configFile, '../..')
-      if (isParentFolder(root, filepath) && this.workspaceConfigFile != configFile) {
+      if (isParentFolder(root, filepath, true) && this.workspaceConfigFile != configFile) {
         this.changeConfiguration(ConfigurationTarget.Workspace, model, configFile)
         break
       }
@@ -187,7 +187,7 @@ export default class Configurations {
 
   public hasFolderConfiguration(filepath: string): boolean {
     let { folders } = this
-    return folders.findIndex(f => isParentFolder(f, filepath)) !== -1
+    return folders.findIndex(f => isParentFolder(f, filepath, true)) !== -1
   }
 
   public getConfigFile(target: ConfigurationTarget): string {
@@ -300,12 +300,13 @@ export default class Configurations {
     let filepath = u.fsPath
     for (let [configFile, model] of this.foldConfigurations) {
       let root = path.resolve(configFile, '../..')
-      if (isParentFolder(root, filepath)) return model
+      if (isParentFolder(root, filepath, true)) return model
     }
     return new ConfigurationModel()
   }
 
   public checkFolderConfiguration(uri: string): void {
+    logger.debug(`checkFolderConfiguration: ${uri}`)
     let u = URI.parse(uri)
     if (u.scheme != 'file') return
     let rootPath = path.dirname(u.fsPath)
@@ -314,6 +315,7 @@ export default class Configurations {
       if (folder && folder != os.homedir()) {
         let file = path.join(folder, 'coc-settings.json')
         if (fs.existsSync(file)) {
+          logger.debug(`checkFolderConfiguration: add folder setting file ${file}`)
           this.addFolderFile(file)
         }
       }

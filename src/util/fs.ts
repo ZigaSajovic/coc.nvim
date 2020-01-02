@@ -58,10 +58,8 @@ export async function isGitIgnored(fullpath: string): Promise<boolean> {
 
 export function resolveRoot(dir: string, subs: string[], cwd?: string): string | null {
   let home = os.homedir()
-  if (isParentFolder(dir, home)) return null
-  let { root } = path.parse(dir)
-  if (root == dir) return null
-  if (cwd && cwd != home && isParentFolder(cwd, dir) && inDirectory(cwd, subs)) return cwd
+  if (isParentFolder(dir, home, true)) return null
+  if (cwd && isParentFolder(cwd, dir, true) && inDirectory(cwd, subs)) return cwd
   let parts = dir.split(path.sep)
   let curr: string[] = [parts.shift()]
   for (let part of parts) {
@@ -220,10 +218,17 @@ export function parentDirs(pth: string): string[] {
   return dirs
 }
 
-export function isParentFolder(folder: string, filepath: string): boolean {
-  let pdir = path.resolve(path.normalize(folder)) + (path.sep || '/')
-  let dir = path.resolve(path.normalize(filepath))
+export function isParentFolder(folder: string, filepath: string, checkEqual = false): boolean {
+  let pdir = fixDriver(path.resolve(path.normalize(folder)))
+  let dir = fixDriver(path.resolve(path.normalize(filepath)))
   if (pdir == '//') pdir = '/'
-  if (pdir == dir) return false
-  return dir.slice(0, pdir.length) === pdir
+  if (pdir == dir) return checkEqual ? true : false
+  if (pdir.endsWith(path.sep)) return dir.startsWith(pdir)
+  return dir.startsWith(pdir) && dir[pdir.length] == path.sep
+}
+
+// use uppercase for windows driver
+export function fixDriver(filepath: string): string {
+  if (os.platform() != 'win32' || filepath[1] != ':') return filepath
+  return filepath[0].toUpperCase() + filepath.slice(1)
 }

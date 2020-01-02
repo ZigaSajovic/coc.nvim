@@ -10,10 +10,13 @@ import { URI } from 'vscode-uri'
 import which from 'which'
 import { MapMode } from '../types'
 import * as platform from './platform'
+import { Lazy } from './lazy'
 
 export { platform }
 const logger = require('./logger')('util-index')
 const prefix = '[coc.nvim] '
+
+export { Lazy }
 
 export function escapeSingleQuote(str: string): string {
   return str.replace(/'/g, "''")
@@ -124,8 +127,7 @@ export function isRunning(pid: number): boolean {
 }
 
 export function getKeymapModifier(mode: MapMode): string {
-  if (mode == 'o' || mode == 'x') return '<C-U>'
-  if (mode == 'n' || mode == 'v') return ''
+  if (mode == 'n' || mode == 'o' || mode == 'x' || mode == 'v') return '<C-U>'
   if (mode == 'i') return '<C-o>'
   if (mode == 's') return '<Esc>'
   return ''
@@ -146,4 +148,23 @@ export function isDocumentEdit(edit: any): boolean {
   if (!TextDocumentIdentifier.is(edit.textDocument)) return false
   if (!Array.isArray(edit.edits)) return false
   return true
+}
+
+export function concurrent(fns: (() => Promise<any>)[], limit = Infinity): Promise<any[]> {
+  if (fns.length == 0) return Promise.resolve([])
+  return new Promise((resolve, rejrect) => {
+    let remain = fns.slice()
+    let results = []
+    let next = () => {
+      if (remain.length == 0) {
+        return resolve(results)
+      }
+      let list = remain.splice(0, limit)
+      Promise.all(list.map(fn => fn())).then(res => {
+        results.push(...res)
+        next()
+      }, rejrect)
+    }
+    next()
+  })
 }
