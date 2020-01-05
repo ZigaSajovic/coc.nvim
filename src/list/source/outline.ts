@@ -76,7 +76,7 @@ export default class Outline extends LocationList {
     nvim.command('syntax match CocOutlineName /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=CocOutlineLine', true);
     nvim.command('syntax match CocOutlineKind /\\[\\w\\+\\]/ contained containedin=CocOutlineLine', true)
     nvim.command('syntax match CocOutlineLineNr /\\d\\+$/ contained containedin=CocOutlineLine', true)
-    nvim.command('highlight default link CocOutlineName Comment', true);
+    nvim.command('highlight default link CocOutlineName Normal', true);
     nvim.command('highlight default link CocOutlineKind Typedef', true)
     nvim.command('highlight default link CocOutlineLineNr Comment', true)
     nvim.resumeNotification().catch(_e => {
