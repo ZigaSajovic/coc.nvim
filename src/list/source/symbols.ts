@@ -77,7 +77,7 @@ export default class Symbols extends LocationList {
     nvim.command('syntax match CocSymbolsName /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=CocSymbolsLine', true);
     nvim.command('syntax match CocSymbolsKind /\\[\\w\\+\\]\\t/ contained containedin=CocSymbolsLine', true)
     nvim.command('syntax match CocSymbolsFile /\\S\\+$/ contained containedin=CocSymbolsLine', true)
-    nvim.command('highlight default link CocSymbolsName None', true)
+    nvim.command('highlight default link CocSymbolsName NormalNoBackground', true)
     nvim.command('highlight default link CocSymbolsKind Typedef', true)
     nvim.command('highlight default link CocSymbolsFile Comment', true)
     nvim.resumeNotification().catch(_e => {

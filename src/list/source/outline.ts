@@ -10,11 +10,22 @@ import { writeFile } from '../../util/fs'
 import workspace from '../../workspace'
 import LocationList from './location'
 import { getSymbolKind } from '../../util/convert'
+import { Neovim } from '@chemzqm/neovim'
 const logger = require('../../util/logger')('list-symbols')
 
 export default class Outline extends LocationList {
   public readonly description = 'symbols of current document'
   public name = 'outline'
+  private allowed_kinds;
+
+
+  constructor(nvim: Neovim, _allowed_kinds: Array<string> = [], _name: string = 'outline') {
+    super(nvim)
+    this.allowed_kinds = _allowed_kinds;
+    this.name = _name;
+    this.addLocationActions()
+  }
+
 
   public async loadItems(context: ListContext): Promise<ListItem[]> {
     let buf = await context.window.buffer
@@ -31,10 +42,12 @@ export default class Outline extends LocationList {
     let items: ListItem[] = []
     let isSymbols = !symbols[0].hasOwnProperty('location')
     if (isSymbols) {
-      function addSymbols(symbols: DocumentSymbol[], level = 0): void {
+      function addSymbols(allowed_kinds: Array<string>, symbols: DocumentSymbol[], level = 0): void {
         symbols.sort(sortSymbols)
         for (let s of symbols) {
           let kind = getSymbolKind(s.kind)
+          if (allowed_kinds.length != 0 && !allowed_kinds.includes(kind))
+            continue;
           let location = Location.create(document.uri, s.selectionRange)
           items.push({
             label: `${' '.repeat(level * 2)}${s.name}\t[${kind}]\t${s.range.start.line + 1}`,
@@ -42,11 +55,11 @@ export default class Outline extends LocationList {
             location
           })
           if (s.children && s.children.length) {
-            addSymbols(s.children, level + 1)
+            addSymbols(allowed_kinds, s.children, level + 1)
           }
         }
       }
-      addSymbols(symbols as DocumentSymbol[])
+      addSymbols(this.allowed_kinds, symbols as DocumentSymbol[])
     } else {
       (symbols as SymbolInformation[]).sort((a, b) => {
         let sa = a.location.range.start
@@ -56,9 +69,11 @@ export default class Outline extends LocationList {
       })
       for (let s of symbols as SymbolInformation[]) {
         let kind = getSymbolKind(s.kind)
+        if (this.allowed_kinds.length != 0 && !this.allowed_kinds.includes(kind))
+          continue;
         if (s.name.endsWith(') callback')) continue
         if (s.location.uri === undefined) {
-            s.location.uri = document.uri
+          s.location.uri = document.uri
         }
         items.push({
           label: `${s.name} [${kind}] ${s.location.range.start.line + 1}`,
@@ -73,12 +88,14 @@ export default class Outline extends LocationList {
   public doHighlight(): void {
     let { nvim } = this
     nvim.pauseNotification()
-    nvim.command('syntax match CocOutlineName /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=CocOutlineLine', true);
-    nvim.command('syntax match CocOutlineKind /\\[\\w\\+\\]/ contained containedin=CocOutlineLine', true)
-    nvim.command('syntax match CocOutlineLineNr /\\d\\+$/ contained containedin=CocOutlineLine', true)
-    nvim.command('highlight default link CocOutlineName Normal', true);
-    nvim.command('highlight default link CocOutlineKind Typedef', true)
-    nvim.command('highlight default link CocOutlineLineNr Comment', true)
+    let _name = this.name;
+    _name.charAt(0).toUpperCase;
+    nvim.command(`syntax match Coc${_name}Name /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=Coc${_name}Line`, true);
+    nvim.command(`syntax match Coc${_name}Kind /\\[\\w\\+\\]/ contained containedin=Coc${_name}Line`, true)
+    nvim.command(`syntax match Coc${_name}LineNr /\\d\\+$/ contained containedin=Coc${_name}Line`, true)
+    nvim.command(`highlight default link Coc${_name}Name NormalNoBackground`, true);
+    nvim.command(`highlight default link Coc${_name}Kind Typedef`, true)
+    nvim.command(`highlight default link Coc${_name}LineNr Comment`, true)
     nvim.resumeNotification().catch(_e => {
       // noop
     })
@@ -115,7 +132,7 @@ export default class Outline extends LocationList {
       if (!text) continue
       let idx = text.indexOf(parts[0])
       let start = idx == -1 ? 0 : idx
-      let range: Range = Range.create(lnum -1, start, lnum - 1, start + parts[0].length)
+      let range: Range = Range.create(lnum - 2, start, lnum - 1, start + parts[0].length)
       items.push({
         label: `${parts[0]} [${parts[3]}] ${lnum}`,
         filterText: parts[0],
