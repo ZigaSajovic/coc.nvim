@@ -135,7 +135,7 @@ export class ListManager implements Disposable {
     this.registerList(new LocationList(nvim))
     this.registerList(new SymbolsList(nvim))
     this.registerList(new OutlineList(nvim))
-    this.registerList(new OutlineList(nvim, ['Function'], 'outline_function'))
+    this.registerList(new OutlineList(nvim, ['Function'], 'outlineFunction'))
     this.registerList(new CommandsList(nvim))
     this.registerList(new ExtensionList(nvim))
     this.registerList(new DiagnosticsList(nvim))
