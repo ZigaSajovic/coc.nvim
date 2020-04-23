@@ -3,16 +3,16 @@ import { EventEmitter } from 'events'
 import { CodeActionKind, Location } from 'vscode-languageserver-types'
 import commandManager from './commands'
 import completion from './completion'
+import Cursors from './cursors'
 import diagnosticManager from './diagnostic/manager'
 import extensions from './extensions'
 import Handler from './handler'
+import languages from './languages'
 import listManager from './list/manager'
 import services from './services'
 import snippetManager from './snippets/manager'
 import sources from './sources'
 import { Autocmd, OutputChannel, PatternType } from './types'
-import Cursors from './cursors'
-import clean from './util/clean'
 import workspace from './workspace'
 const logger = require('./util/logger')('plugin')
 
@@ -28,8 +28,11 @@ export default class Plugin extends EventEmitter {
       get: () => this.nvim
     })
     this.cursors = new Cursors(nvim)
-    this.addMethod('hasProvider', async (id: string) => {
+    this.addMethod('hasProvider', (id: string) => {
       return this.handler.hasProvider(id)
+    })
+    this.addMethod('getTagList', async () => {
+      return await this.handler.getTagList()
     })
     this.addMethod('hasSelected', () => {
       return completion.hasSelected()
@@ -45,6 +48,10 @@ export default class Plugin extends EventEmitter {
     })
     this.addMethod('codeActionRange', (start, end, only) => {
       return this.handler.codeActionRange(start, end, only)
+    })
+    this.addMethod('getConfig', async key => {
+      let document = await workspace.document
+      return workspace.getConfiguration(key, document ? document.uri : undefined)
     })
     this.addMethod('rootPatterns', bufnr => {
       let doc = workspace.getDocument(bufnr)
@@ -93,6 +100,9 @@ export default class Plugin extends EventEmitter {
     this.addMethod('sendRequest', (id: string, method: string, params?: any) => {
       return services.sendRequest(id, method, params)
     })
+    this.addMethod('sendNotification', async (id: string, method: string, params?: any) => {
+      await services.sendNotification(id, method, params)
+    })
     this.addMethod('registNotification', async (id: string, method: string) => {
       await services.registNotification(id, method)
     })
@@ -121,6 +131,9 @@ export default class Plugin extends EventEmitter {
     this.addMethod('snippetCancel', () => {
       snippetManager.cancel()
     })
+    this.addMethod('openLocalConfig', async () => {
+      await workspace.openLocalConfig()
+    })
     this.addMethod('openLog', () => {
       let file = logger.getLogFile()
       nvim.call(`coc#util#open_file`, ['edit', file], true)
@@ -144,7 +157,6 @@ export default class Plugin extends EventEmitter {
       nvim.setVar('WorkspaceFolders', workspace.folderPaths, true)
     })
     commandManager.init(nvim, this)
-    clean() // tslint:disable-line
   }
 
   private addMethod(name: string, fn: Function): any {
@@ -280,10 +292,6 @@ export default class Plugin extends EventEmitter {
     channel.appendLine('term: ' + (process.env.TERM_PROGRAM || process.env.TERM))
     channel.appendLine('platform: ' + process.platform)
     channel.appendLine('')
-    channel.appendLine('## Messages')
-    let msgs = await this.nvim.call('coc#rpc#get_errors') as string[]
-    channel.append(msgs.join('\n'))
-    channel.appendLine('')
     for (let ch of (workspace as any).outputChannels.values()) {
       if (ch.name !== 'info') {
         channel.appendLine(`## Output channel: ${ch.name}\n`)
@@ -371,6 +379,13 @@ export default class Plugin extends EventEmitter {
         case 'workspaceSymbols':
           this.nvim.command('CocList -I symbols', true)
           return
+        case 'getWorkspaceSymbols': {
+          let bufnr = args[2]
+          if (!bufnr) bufnr = await this.nvim.eval('bufnr("%")') as number
+          let document = workspace.getDocument(bufnr)
+          if (!document) return
+          return await languages.getWorkspaceSymbols(document.textDocument, args[1])
+        }
         case 'formatSelected':
           return await handler.documentRangeFormatting(args[1])
         case 'format':
@@ -417,6 +432,8 @@ export default class Plugin extends EventEmitter {
           return await handler.getWordEdit()
         case 'addRanges':
           return await this.cursors.addRanges(args[1])
+        case 'currentWorkspacePath':
+          return workspace.rootPath
         default:
           workspace.showMessage(`unknown action ${args[0]}`, 'error')
       }

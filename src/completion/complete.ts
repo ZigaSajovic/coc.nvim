@@ -64,7 +64,7 @@ export default class Complete {
     // new option for each source
     let opt = Object.assign({}, this.option)
     let timeout = this.config.timeout
-    timeout = Math.max(Math.min(timeout, 5000), 1000)
+    timeout = Math.max(Math.min(timeout, 15000), 500)
     try {
       if (typeof source.shouldComplete === 'function') {
         let shouldRun = await Promise.resolve(source.shouldComplete(opt))
@@ -174,7 +174,7 @@ export default class Complete {
     })
     let now = Date.now()
     let { bufnr } = this.option
-    let { snippetIndicator, removeDuplicateItems, fixInsertedWord } = this.config
+    let { snippetIndicator, removeDuplicateItems, fixInsertedWord, asciiCharactersOnly } = this.config
     let followPart = (!fixInsertedWord || cid == 0) ? '' : this.getFollowPart()
     if (results.length == 0) return []
     // max score of high priority source
@@ -189,8 +189,11 @@ export default class Complete {
       for (let idx = 0; idx < items.length; idx++) {
         let item = items[idx]
         let { word } = item
+        if (asciiCharactersOnly && !/^[\x00-\x7F]*$/.test(word)) {
+          continue
+        }
         if ((!item.dup || source == 'tabnine') && words.has(word)) continue
-        if (removeDuplicateItems && !item.isSnippet && words.has(word)) continue
+        if (removeDuplicateItems && !item.isSnippet && words.has(word) && item.line == undefined) continue
         let filterText = item.filterText || item.word
         item.filterText = filterText
         if (filterText.length < input.length) continue
@@ -223,12 +226,10 @@ export default class Complete {
           } else {
             item.recentScore = 0
           }
-        } else {
-          delete item.sortText
         }
         item.priority = priority
         item.abbr = item.abbr || item.word
-        item.score = input.length ? score : 0
+        item.score = input.length ? score * (item.sourceScore || 1) : 0
         item.localBonus = this.localBonus ? this.localBonus.get(filterText) || 0 : 0
         words.add(word)
         if (item.isSnippet && item.word == input) {

@@ -65,7 +65,7 @@ export default class Floating {
         win.setVar('float', 1, true)
         win.setVar('popup', 1, true)
         nvim.command(`noa call win_gotoid(${win.id})`, true)
-        nvim.command(`setl nospell nolist wrap linebreak foldcolumn=1`, true)
+        nvim.command(`setl nospell nolist wrap linebreak foldcolumn=1 showbreak=`, true)
         nvim.command(`setl nonumber norelativenumber nocursorline nocursorcolumn colorcolumn=`, true)
         nvim.command(`setl signcolumn=no conceallevel=2 concealcursor=n`, true)
         nvim.command(`setl winhl=Normal:CocFloating,NormalNC:CocFloating,FoldColumn:CocFloating`, true)
@@ -102,9 +102,9 @@ export default class Floating {
     this.popup.move({
       line: rect.row + 1,
       col: rect.col + 1,
-      minwidth: rect.width,
+      minwidth: rect.width - 4,
       minheight: rect.height,
-      maxwidth: rect.width,
+      maxwidth: rect.width - 4,
       maxheight: rect.height
     })
     this.popup.show()
@@ -167,7 +167,9 @@ export default class Floating {
         win.setVar('float', 1, true)
         win.setVar('popup', 1, true)
         win.setOption('linebreak', true, true)
-        win.setOption('showbreak', '', true)
+        if (workspace.isVim && parseInt(workspace.env.version, 10) >= 8012281) {
+          win.setOption('showbreak', 'NONE', true)
+        }
         win.setOption('conceallevel', 2, true)
         await nvim.resumeNotification()
       }

@@ -1,6 +1,8 @@
 import { Neovim } from '@chemzqm/neovim'
-import { CancellationToken, CancellationTokenSource, CodeAction, CodeActionContext, CodeActionKind, CodeLens, ColorInformation, ColorPresentation, CompletionItem, CompletionItemKind, CompletionList, CompletionTriggerKind, Disposable, DocumentHighlight, DocumentLink, DocumentSelector, DocumentSymbol, FoldingRange, FormattingOptions, Hover, InsertTextFormat, Location, LocationLink, Position, Range, SelectionRange, SignatureHelp, SymbolInformation, TextDocument, TextEdit, WorkspaceEdit } from 'vscode-languageserver-protocol'
+import { CancellationToken, CancellationTokenSource, CodeAction, CodeActionContext, CodeActionKind, CodeLens, ColorInformation, ColorPresentation, CompletionItem, CompletionItemKind, CompletionList, CompletionTriggerKind, Disposable, DocumentHighlight, DocumentLink, DocumentSelector, DocumentSymbol, FoldingRange, FormattingOptions, Hover, InsertTextFormat, Location, LocationLink, Position, Range, SelectionRange, SignatureHelp, SymbolInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import commands from './commands'
+import events from './events'
 import diagnosticManager from './diagnostic/manager'
 import { CodeActionProvider, CodeLensProvider, CompletionItemProvider, DeclarationProvider, DefinitionProvider, DocumentColorProvider, DocumentFormattingEditProvider, DocumentLinkProvider, DocumentRangeFormattingEditProvider, DocumentSymbolProvider, FoldingContext, FoldingRangeProvider, HoverProvider, ImplementationProvider, OnTypeFormattingEditProvider, ReferenceContext, ReferenceProvider, RenameProvider, SelectionRangeProvider, SignatureHelpProvider, TypeDefinitionProvider, WorkspaceSymbolProvider } from './provider'
 import CodeActionManager from './provider/codeActionmanager'
@@ -29,7 +31,7 @@ import { CompleteOption, CompleteResult, CompletionContext, DiagnosticCollection
 import { wait } from './util'
 import * as complete from './util/complete'
 import { getChangedFromEdits, rangeOverlap } from './util/position'
-import { byteLength } from './util/string'
+import { byteLength, byteIndex, byteSlice } from './util/string'
 import workspace from './workspace'
 const logger = require('./util/logger')('languages')
 
@@ -170,8 +172,8 @@ class Languages {
       priority: getConfig<number>('languageSourcePriority', 99),
       echodocSupport: getConfig<boolean>('echodocSupport', false),
       waitTime: getConfig<number>('triggerCompletionWait', 60),
-      detailField: getConfig<string>('detailField', 'abbr'),
-      detailMaxLength: getConfig<number>('detailMaxLength', 50),
+      detailField: getConfig<string>('detailField', 'menu'),
+      detailMaxLength: getConfig<number>('detailMaxLength', 100),
       invalidInsertCharacters: getConfig<string[]>('invalidInsertCharacters', [' ', '(', '<', '{', '[', '\r', '\n']),
     }
   }
@@ -190,10 +192,11 @@ class Languages {
     languageIds: string | string[] | null,
     provider: CompletionItemProvider,
     triggerCharacters: string[] = [],
-    priority?: number
+    priority?: number,
+    allCommitCharacters?: string[]
   ): Disposable {
     languageIds = typeof languageIds == 'string' ? [languageIds] : languageIds
-    let source = this.createCompleteSource(name, shortcut, provider, languageIds, triggerCharacters, priority)
+    let source = this.createCompleteSource(name, shortcut, provider, languageIds, triggerCharacters, allCommitCharacters || [], priority)
     sources.addSource(source)
     logger.debug('created service source', name)
     return {
@@ -419,7 +422,7 @@ class Languages {
 
   @check
   public async provideFoldingRanges(document: TextDocument, context: FoldingContext): Promise<FoldingRange[] | null> {
-    if (!this.formatRangeManager.hasProvider(document)) {
+    if (!this.foldingRangeManager.hasProvider(document)) {
       return null
     }
     return await this.foldingRangeManager.provideFoldingRanges(document, context, this.token)
@@ -510,7 +513,8 @@ class Languages {
     provider: CompletionItemProvider,
     languageIds: string[] | null,
     triggerCharacters: string[],
-    priority?: number
+    allCommitCharacters: string[],
+    priority?: number | undefined
   ): ISource {
     // track them for resolve
     let completeItems: CompletionItem[] = []
@@ -549,24 +553,26 @@ class Languages {
           result = await Promise.resolve(provider.provideCompletionItems(doc.textDocument, position, token, context))
         } catch (e) {
           // don't disturb user
-          logger.error(`Source "${name}" complete error:`, e)
+          logger.error(`Complete "${name}" error:`, e)
           return null
         }
         if (!result || token.isCancellationRequested) return null
         completeItems = Array.isArray(result) ? result : result.items
         if (!completeItems || completeItems.length == 0) return null
-        // used for fixed col
+        let startcol = this.getStartColumn(opt.line, completeItems)
         let option: CompleteOption = Object.assign({}, opt)
-        if (typeof (result as any).startcol == 'number') {
-          option.col = (result as any).startcol
+        let prefix: string
+        if (startcol != null && startcol < option.col) {
+          prefix = byteSlice(opt.line, startcol, option.col)
+          option.col = startcol
         }
         let items: VimCompleteItem[] = completeItems.map((o, index) => {
-          let item = this.convertVimCompleteItem(o, shortcut, option)
+          let item = this.convertVimCompleteItem(o, shortcut, option, prefix)
           item.index = index
           return item
         })
         return {
-          startcol: (result as any).startcol,
+          startcol,
           isIncomplete: !!(result as CompletionList).isIncomplete,
           items
         }
@@ -647,11 +653,8 @@ class Languages {
       shouldCommit: (item: VimCompleteItem, character: string): boolean => {
         let completeItem = completeItems[item.index]
         if (!completeItem) return false
-        let { commitCharacters } = completeItem
-        if (commitCharacters && commitCharacters.indexOf(character) !== -1) {
-          return true
-        }
-        return false
+        let commitCharacters = completeItem.commitCharacters || allCommitCharacters
+        return commitCharacters.indexOf(character) !== -1
       }
     }
     return source
@@ -669,6 +672,28 @@ class Languages {
     let { line, bufnr, linenr } = option
     let doc = workspace.getDocument(bufnr)
     if (!doc) return false
+    if (events.cursor.lnum == option.linenr + 1) {
+      // line break during completion
+      let preline = await nvim.call('getline', [option.linenr]) as string
+      let { length } = preline
+      let { range } = textEdit
+      if (length && range.start.character > length) {
+        line = line.slice(preline.length)
+        let spaceCount = 0
+        if (/^\s/.test(line)) {
+          spaceCount = line.match(/^\s+/)[0].length
+          line = line.slice(spaceCount)
+        }
+        range.start.character = range.start.character - length - spaceCount
+        range.end.character = range.end.character - length - spaceCount
+        range.start.line = range.start.line + 1
+        range.end.line = range.end.line + 1
+        linenr = linenr + 1
+      } else {
+        // can't handle
+        return false
+      }
+    }
     let { range, newText } = textEdit
     let isSnippet = item.insertTextFormat === InsertTextFormat.Snippet
     // replace inserted word
@@ -717,26 +742,47 @@ class Languages {
     if (changed) await workspace.moveTo(Position.create(pos.line + changed.line, pos.character + changed.character))
   }
 
-  private convertVimCompleteItem(item: CompletionItem, shortcut: string, opt: CompleteOption): VimCompleteItem {
+  private getStartColumn(line: string, items: CompletionItem[]): number | null {
+    let first = items[0]
+    if (!first.textEdit) return null
+    let { character } = first.textEdit.range.start
+    for (let i = 0; i < 10; i++) {
+      let o = items[i]
+      if (!o) break
+      if (!o.textEdit) return null
+      if (o.textEdit.range.start.character !== character) return null
+    }
+    return byteIndex(line, character)
+  }
+
+  private convertVimCompleteItem(item: CompletionItem, shortcut: string, opt: CompleteOption, prefix: string): VimCompleteItem {
     let { echodocSupport, detailField, detailMaxLength, invalidInsertCharacters } = this.completeConfig
     let hasAdditionalEdit = item.additionalTextEdits && item.additionalTextEdits.length > 0
     let isSnippet = item.insertTextFormat === InsertTextFormat.Snippet || hasAdditionalEdit
     let label = item.label.trim()
-    // tslint:disable-next-line:deprecation
-    if (isSnippet && item.insertText && item.insertText.indexOf('$') == -1 && !hasAdditionalEdit) {
-      // fix wrong insert format
-      isSnippet = false
-      item.insertTextFormat = InsertTextFormat.PlainText
-    }
     let obj: VimCompleteItem = {
       word: complete.getWord(item, opt, invalidInsertCharacters),
       abbr: label,
       menu: `[${shortcut}]`,
       kind: complete.completionKindString(item.kind, this.completionItemKindMap, this.completeConfig.defaultKindText),
       sortText: item.sortText || null,
+      sourceScore: item['score'] || null,
       filterText: item.filterText || label,
       isSnippet,
       dup: item.data && item.data.dup == 0 ? 0 : 1
+    }
+    if (prefix) {
+      if (!obj.filterText.startsWith(prefix)) {
+        if (item.textEdit && item.textEdit.newText.startsWith(prefix)) {
+          obj.filterText = item.textEdit.newText.split(/\n/)[0]
+        } else {
+          obj.filterText = `${prefix}${obj.filterText}`
+        }
+      }
+      if (!item.textEdit && !obj.word.startsWith(prefix)) {
+        // fix remains completeItem that should not change startcol
+        obj.word = `${prefix}${obj.word}`
+      }
     }
     if (item && item.detail && detailField != 'preview') {
       let detail = item.detail.replace(/\n\s*/g, ' ')

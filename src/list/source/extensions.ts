@@ -1,12 +1,15 @@
 import { Neovim } from '@chemzqm/neovim'
+import rimraf from 'rimraf'
+import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { URI } from 'vscode-uri'
 import extensions from '../../extensions'
 import { ListContext, ListItem } from '../../types'
 import { wait } from '../../util'
 import { readdirAsync } from '../../util/fs'
-import BasicList from '../basic'
 import workspace from '../../workspace'
+import BasicList from '../basic'
 const logger = require('../../util/logger')('list-extensions')
 
 export default class ExtensionList extends BasicList {
@@ -26,6 +29,25 @@ export default class ExtensionList extends BasicList {
       }
       await wait(100)
     }, { persist: true, reload: true, parallel: true })
+
+    this.addAction('configuration', async item => {
+      let { root } = item.data
+      let jsonFile = path.join(root, 'package.json')
+      if (fs.existsSync(jsonFile)) {
+        let lines = fs.readFileSync(jsonFile, 'utf8').split(/\r?\n/)
+        let idx = lines.findIndex(s => s.indexOf('"contributes"') !== -1)
+        await workspace.jumpTo(URI.file(jsonFile).toString(), { line: idx == -1 ? 0 : idx, character: 0 })
+      }
+    })
+
+    this.addAction('open', async item => {
+      let { root } = item.data
+      if (workspace.env.isiTerm) {
+        nvim.call('coc#util#iterm_open', [root], true)
+      } else {
+        nvim.call('coc#util#open_url', [root], true)
+      }
+    })
 
     this.addAction('disable', async item => {
       let { id, state } = item.data
@@ -61,6 +83,23 @@ export default class ExtensionList extends BasicList {
       extensions.activate(id)
       await wait(100)
     }, { persist: true, reload: true })
+
+    this.addAction('fix', async item => {
+      let { root } = item.data
+      let { npm } = extensions
+      if (!npm) return
+      let folder = path.join(root, 'node_modules')
+      if (fs.existsSync(folder)) {
+        rimraf.sync(folder)
+      }
+      let terminal = await workspace.createTerminal({
+        cwd: root
+      })
+      let shown = await terminal.show(false)
+      if (!shown) return
+      workspace.nvim.command(`startinsert`, true)
+      terminal.sendText(`${npm} install --production --ignore-scripts --no-lockfile`, true)
+    })
 
     this.addMultipleAction('uninstall', async items => {
       let ids = []

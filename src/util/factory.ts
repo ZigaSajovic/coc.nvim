@@ -32,7 +32,6 @@ const Module: IModule = require('module')
 const REMOVED_GLOBALS = [
   'reallyExit',
   'abort',
-  'chdir',
   'umask',
   'setuid',
   'setgid',
@@ -99,6 +98,9 @@ function createSandbox(filename: string, logger: Logger): ISandbox {
     module,
     Buffer,
     console: {
+      debug: (...args: any[]) => {
+        logger.debug.apply(logger, args)
+      },
       log: (...args: any[]) => {
         logger.debug.apply(logger, args)
       },
@@ -135,6 +137,8 @@ function createSandbox(filename: string, logger: Logger): ISandbox {
   REMOVED_GLOBALS.forEach(name => {
     sandbox.process[name] = removedGlobalStub(name)
   })
+  // tslint:disable-next-line: no-empty
+  sandbox.process['chdir'] = () => { }
 
   // read-only umask
   sandbox.process.umask = (mask: number) => {

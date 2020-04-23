@@ -4,29 +4,29 @@
  *--------------------------------------------------------------------------------------------*/
 /*tslint:disable*/
 import path from 'path'
-import { ApplyWorkspaceEditParams, ApplyWorkspaceEditRequest, ApplyWorkspaceEditResponse, CancellationToken, ClientCapabilities, CodeAction, CodeActionContext, CodeActionKind, CodeActionParams, CodeActionRegistrationOptions, CodeActionRequest, CodeLens, CodeLensRegistrationOptions, CodeLensRequest, CodeLensResolveRequest, Command, CompletionContext, CompletionItem, CompletionItemKind, CompletionList, CompletionRegistrationOptions, CompletionRequest, CompletionResolveRequest, createProtocolConnection, Definition, DefinitionRequest, Diagnostic, DidChangeConfigurationNotification, DidChangeConfigurationParams, DidChangeConfigurationRegistrationOptions, DidChangeTextDocumentNotification, DidChangeTextDocumentParams, DidChangeWatchedFilesNotification, DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions, DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams, Disposable, DocumentFormattingParams, DocumentFormattingRequest, DocumentHighlight, DocumentHighlightRequest, DocumentLink, DocumentLinkRegistrationOptions, DocumentLinkRequest, DocumentLinkResolveRequest, DocumentOnTypeFormattingParams, DocumentOnTypeFormattingRegistrationOptions, DocumentOnTypeFormattingRequest, DocumentRangeFormattingParams, DocumentRangeFormattingRequest, DocumentSelector, DocumentSymbol, DocumentSymbolRequest, Emitter, ErrorCodes, Event, ExecuteCommandParams, ExecuteCommandRegistrationOptions, ExecuteCommandRequest, ExitNotification, FailureHandlingKind, FileChangeType, FileEvent, FormattingOptions, GenericNotificationHandler, GenericRequestHandler, Hover, HoverRequest, InitializedNotification, InitializeError, InitializeParams, InitializeRequest, InitializeResult, Location, Logger, LogMessageNotification, LogMessageParams, MarkupKind, Message, MessageReader, MessageType, MessageWriter, NotificationHandler, NotificationHandler0, NotificationType, NotificationType0, Position, PrepareRenameRequest, PublishDiagnosticsNotification, PublishDiagnosticsParams, Range, ReferencesRequest, RegistrationParams, RegistrationRequest, RenameParams, RenameRegistrationOptions, RenameRequest, RequestHandler, RequestHandler0, RequestType, RequestType0, ResourceOperationKind, ResponseError, RPCMessageType, ServerCapabilities, ShowMessageNotification, ShowMessageParams, ShowMessageRequest, ShutdownRequest, SignatureHelp, SignatureHelpRegistrationOptions, SignatureHelpRequest, SymbolInformation, SymbolKind, TelemetryEventNotification, TextDocument, TextDocumentChangeRegistrationOptions, TextDocumentPositionParams, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Trace, TraceFormat, TraceOptions, Tracer, UnregistrationParams, UnregistrationRequest, WatchKind, WillSaveTextDocumentNotification, WillSaveTextDocumentParams, WillSaveTextDocumentWaitUntilRequest, WorkspaceEdit, WorkspaceFolder, WorkspaceSymbolRequest } from 'vscode-languageserver-protocol'
+import { ApplyWorkspaceEditParams, ApplyWorkspaceEditRequest, ApplyWorkspaceEditResponse, CancellationToken, ClientCapabilities, CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionParams, CodeActionRegistrationOptions, CodeActionRequest, CodeLens, CodeLensOptions, CodeLensRegistrationOptions, CodeLensRequest, CodeLensResolveRequest, Command, CompletionContext, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions, CompletionRegistrationOptions, CompletionRequest, CompletionResolveRequest, createProtocolConnection, DeclarationRequest, Definition, DefinitionOptions, DefinitionRegistrationOptions, DefinitionRequest, Diagnostic, DidChangeConfigurationNotification, DidChangeConfigurationParams, DidChangeConfigurationRegistrationOptions, DidChangeTextDocumentNotification, DidChangeTextDocumentParams, DidChangeWatchedFilesNotification, DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions, DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams, Disposable, DocumentColorRequest, DocumentFormattingOptions, DocumentFormattingParams, DocumentFormattingRequest, DocumentHighlight, DocumentHighlightOptions, DocumentHighlightRegistrationOptions, DocumentHighlightRequest, DocumentLink, DocumentLinkOptions, DocumentLinkRegistrationOptions, DocumentLinkRequest, DocumentLinkResolveRequest, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentOnTypeFormattingRegistrationOptions, DocumentOnTypeFormattingRequest, DocumentRangeFormattingOptions, DocumentRangeFormattingParams, DocumentRangeFormattingRegistrationOptions, DocumentRangeFormattingRequest, DocumentSelector, DocumentSymbol, DocumentSymbolOptions, DocumentSymbolRegistrationOptions, DocumentSymbolRequest, Emitter, ErrorCodes, Event, ExecuteCommandParams, ExecuteCommandRegistrationOptions, ExecuteCommandRequest, ExitNotification, FailureHandlingKind, FileChangeType, FileEvent, FoldingRangeRequest, FormattingOptions, GenericNotificationHandler, GenericRequestHandler, Hover, HoverOptions, HoverRegistrationOptions, HoverRequest, ImplementationRequest, InitializedNotification, InitializeError, InitializeParams, InitializeRequest, InitializeResult, Location, Logger, LogMessageNotification, LogMessageParams, MarkupKind, Message, MessageReader, MessageType, MessageWriter, NotificationHandler, NotificationHandler0, NotificationType, NotificationType0, Position, PrepareRenameRequest, ProgressToken, ProgressType, Proposed, PublishDiagnosticsNotification, PublishDiagnosticsParams, Range, ReferenceOptions, ReferenceRegistrationOptions, ReferencesRequest, RegistrationParams, RegistrationRequest, RenameOptions, RenameParams, RenameRegistrationOptions, RenameRequest, RequestHandler, RequestHandler0, RequestType, RequestType0, ResourceOperationKind, ResponseError, RPCMessageType, SelectionRangeRequest, ServerCapabilities, ShowMessageNotification, ShowMessageParams, ShowMessageRequest, ShutdownRequest, SignatureHelp, SignatureHelpOptions, SignatureHelpRegistrationOptions, SignatureHelpRequest, StaticRegistrationOptions, SymbolInformation, SymbolKind, SymbolTag, TelemetryEventNotification, TextDocument, TextDocumentChangeRegistrationOptions, TextDocumentEdit, TextDocumentPositionParams, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Trace, TraceFormat, TraceOptions, Tracer, TypeDefinitionRequest, UnregistrationParams, UnregistrationRequest, WatchKind, WillSaveTextDocumentNotification, WillSaveTextDocumentParams, WillSaveTextDocumentWaitUntilRequest, WorkDoneProgressOptions, WorkspaceEdit, WorkspaceFolder, WorkspaceSymbolRegistrationOptions, WorkspaceSymbolRequest, DiagnosticSeverity } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
 import commands from '../commands'
 import languages from '../languages'
 import FileWatcher from '../model/fileSystemWatcher'
-import { ProviderResult } from '../provider'
-import { DiagnosticCollection, OutputChannel, TextDocumentWillSaveEvent, Thenable } from '../types'
+import { CodeActionProvider, CodeLensProvider, CompletionItemProvider, DeclarationProvider, DefinitionProvider, DocumentColorProvider, DocumentFormattingEditProvider, DocumentHighlightProvider, DocumentLinkProvider, DocumentRangeFormattingEditProvider, DocumentSymbolProvider, FoldingRangeProvider, HoverProvider, ImplementationProvider, OnTypeFormattingEditProvider, ProviderResult, ReferenceProvider, RenameProvider, SelectionRangeProvider, SignatureHelpProvider, TypeDefinitionProvider, WorkspaceSymbolProvider } from '../provider'
+import { ConfigurationChangeEvent, DiagnosticCollection, OutputChannel, TextDocumentWillSaveEvent, Thenable } from '../types'
 import { resolveRoot } from '../util/fs'
 import * as Is from '../util/is'
+import { omit } from '../util/lodash'
 import workspace from '../workspace'
 import { ColorProviderMiddleware } from './colorProvider'
 import { ConfigurationWorkspaceMiddleware } from './configuration'
+import { DeclarationMiddleware } from './declaration'
 import { FoldingRangeProviderMiddleware } from './foldingRange'
 import { ImplementationMiddleware } from './implementation'
+import progressManager from './progressPart'
+import { SelectionRangeProviderMiddleware } from './selectionRange'
 import { TypeDefinitionMiddleware } from './typeDefinition'
-import { DeclarationMiddleware } from './declaration'
 import { Delayer } from './utils/async'
 import * as cv from './utils/converter'
 import * as UUID from './utils/uuid'
 import { WorkspaceFolderWorkspaceMiddleware } from './workspaceFolders'
-import { SelectionRangeProviderMiddleware } from './selectionRange'
-import { omit } from '../util/lodash'
-import { Lazy } from '../util'
 
 const logger = require('../util/logger')('language-client-client')
 
@@ -36,19 +36,19 @@ interface IConnection {
   sendRequest<R, E, RO>(
     type: RequestType0<R, E, RO>,
     token?: CancellationToken
-  ): Thenable<R>
+  ): Promise<R>
   sendRequest<P, R, E, RO>(
     type: RequestType<P, R, E, RO>,
     params: P,
     token?: CancellationToken
-  ): Thenable<R>
-  sendRequest<R>(method: string, token?: CancellationToken): Thenable<R>
+  ): Promise<R>
+  sendRequest<R>(method: string, token?: CancellationToken): Promise<R>
   sendRequest<R>(
     method: string,
     param: any,
     token?: CancellationToken
-  ): Thenable<R>
-  sendRequest<R>(type: string | RPCMessageType, ...params: any[]): Thenable<R>
+  ): Promise<R>
+  sendRequest<R>(type: string | RPCMessageType, ...params: any[]): Promise<R>
 
   onRequest<R, E, RO>(
     type: RequestType0<R, E, RO>,
@@ -84,12 +84,14 @@ interface IConnection {
     handler: GenericNotificationHandler
   ): void
 
+  onProgress<P>(type: ProgressType<P>, token: string | number, handler: NotificationHandler<P>): Disposable
+  sendProgress<P>(type: ProgressType<P>, token: string | number, value: P): void
+
   trace(value: Trace, tracer: Tracer, sendNotification?: boolean): void
   trace(value: Trace, tracer: Tracer, traceOptions?: TraceOptions): void
 
-
-  initialize(params: InitializeParams): Thenable<InitializeResult>
-  shutdown(): Thenable<void>
+  initialize(params: InitializeParams): Promise<InitializeResult>
+  shutdown(): Promise<void>
   exit(): void
 
   onLogMessage(handle: NotificationHandler<LogMessageParams>): void
@@ -120,6 +122,17 @@ class ConsoleLogger implements Logger {
   }
   public log(message: string): void {
     logger.log(message)
+  }
+}
+
+export class NullLogger implements Logger {
+  error(_message: string): void {
+  }
+  warn(_message: string): void {
+  }
+  info(_message: string): void {
+  }
+  log(_message: string): void {
   }
 }
 
@@ -157,7 +170,7 @@ function createConnection(
   let result: IConnection = {
     listen: (): void => connection.listen(),
 
-    sendRequest: <R>(type: string | RPCMessageType, ...params: any[]): Thenable<R> =>
+    sendRequest: <R>(type: string | RPCMessageType, ...params: any[]): Promise<R> =>
       connection.sendRequest(Is.string(type) ? type : type.method, ...params),
     onRequest: <R, E>(type: string | RPCMessageType, handler: GenericRequestHandler<R, E>): void =>
       connection.onRequest(Is.string(type) ? type : type.method, handler),
@@ -165,6 +178,8 @@ function createConnection(
       connection.sendNotification(Is.string(type) ? type : type.method, params),
     onNotification: (type: string | RPCMessageType, handler: GenericNotificationHandler): void =>
       connection.onNotification(Is.string(type) ? type : type.method, handler),
+    onProgress: connection.onProgress,
+    sendProgress: connection.sendProgress,
 
     trace: (
       value: Trace,
@@ -328,11 +343,12 @@ export enum RevealOutputChannelOn {
 }
 
 export interface HandleDiagnosticsSignature {
-  (uri: string, diagnostics: Diagnostic[]): void
+  (this: void, uri: string, diagnostics: Diagnostic[]): void
 }
 
 export interface ProvideCompletionItemsSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     context: CompletionContext,
@@ -341,11 +357,12 @@ export interface ProvideCompletionItemsSignature {
 }
 
 export interface ResolveCompletionItemSignature {
-  (item: CompletionItem, token: CancellationToken): ProviderResult<CompletionItem>
+  (this: void, item: CompletionItem, token: CancellationToken): ProviderResult<CompletionItem>
 }
 
 export interface ProvideHoverSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     token: CancellationToken
@@ -354,6 +371,7 @@ export interface ProvideHoverSignature {
 
 export interface ProvideSignatureHelpSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     token: CancellationToken
@@ -362,6 +380,7 @@ export interface ProvideSignatureHelpSignature {
 
 export interface ProvideDefinitionSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     token: CancellationToken
@@ -370,6 +389,7 @@ export interface ProvideDefinitionSignature {
 
 export interface ProvideReferencesSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     options: { includeDeclaration: boolean },
@@ -379,6 +399,7 @@ export interface ProvideReferencesSignature {
 
 export interface ProvideDocumentHighlightsSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     token: CancellationToken
@@ -386,15 +407,16 @@ export interface ProvideDocumentHighlightsSignature {
 }
 
 export interface ProvideDocumentSymbolsSignature {
-  (document: TextDocument, token: CancellationToken): ProviderResult<SymbolInformation[] | DocumentSymbol[]>
+  (this: void, document: TextDocument, token: CancellationToken): ProviderResult<SymbolInformation[] | DocumentSymbol[]>
 }
 
 export interface ProvideWorkspaceSymbolsSignature {
-  (query: string, token: CancellationToken): ProviderResult<SymbolInformation[]>
+  (this: void, query: string, token: CancellationToken): ProviderResult<SymbolInformation[]>
 }
 
 export interface ProvideCodeActionsSignature {
   (
+    this: void,
     document: TextDocument,
     range: Range,
     context: CodeActionContext,
@@ -403,15 +425,16 @@ export interface ProvideCodeActionsSignature {
 }
 
 export interface ProvideCodeLensesSignature {
-  (document: TextDocument, token: CancellationToken): ProviderResult<CodeLens[]>
+  (this: void, document: TextDocument, token: CancellationToken): ProviderResult<CodeLens[]>
 }
 
 export interface ResolveCodeLensSignature {
-  (codeLens: CodeLens, token: CancellationToken): ProviderResult<CodeLens>
+  (this: void, codeLens: CodeLens, token: CancellationToken): ProviderResult<CodeLens>
 }
 
 export interface ProvideDocumentFormattingEditsSignature {
   (
+    this: void,
     document: TextDocument,
     options: FormattingOptions,
     token: CancellationToken
@@ -420,6 +443,7 @@ export interface ProvideDocumentFormattingEditsSignature {
 
 export interface ProvideDocumentRangeFormattingEditsSignature {
   (
+    this: void,
     document: TextDocument,
     range: Range,
     options: FormattingOptions,
@@ -429,6 +453,7 @@ export interface ProvideDocumentRangeFormattingEditsSignature {
 
 export interface ProvideOnTypeFormattingEditsSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     ch: string,
@@ -438,11 +463,12 @@ export interface ProvideOnTypeFormattingEditsSignature {
 }
 
 export interface PrepareRenameSignature {
-  (document: TextDocument, position: Position, token: CancellationToken): ProviderResult<Range | { range: Range, placeholder: string }>
+  (this: void, document: TextDocument, position: Position, token: CancellationToken): ProviderResult<Range | { range: Range, placeholder: string }>
 }
 
 export interface ProvideRenameEditsSignature {
   (
+    this: void,
     document: TextDocument,
     position: Position,
     newName: string,
@@ -451,11 +477,15 @@ export interface ProvideRenameEditsSignature {
 }
 
 export interface ProvideDocumentLinksSignature {
-  (document: TextDocument, token: CancellationToken): ProviderResult<DocumentLink[]>
+  (this: void, document: TextDocument, token: CancellationToken): ProviderResult<DocumentLink[]>
 }
 
 export interface ResolveDocumentLinkSignature {
-  (link: DocumentLink, token: CancellationToken): ProviderResult<DocumentLink>
+  (this: void, link: DocumentLink, token: CancellationToken): ProviderResult<DocumentLink>
+}
+
+export interface ExecuteCommandSignature {
+  (this: void, command: string, args: any[]): ProviderResult<any>
 }
 
 export interface NextSignature<P, R> {
@@ -463,7 +493,11 @@ export interface NextSignature<P, R> {
 }
 
 export interface DidChangeConfigurationSignature {
-  (sections: string[] | undefined): void
+  (this: void, sections: string[] | undefined): void
+}
+
+export interface DidChangeWatchedFileSignature {
+  (this: void, event: FileEvent): void
 }
 
 export interface _WorkspaceMiddleware {
@@ -472,6 +506,7 @@ export interface _WorkspaceMiddleware {
     sections: string[] | undefined,
     next: DidChangeConfigurationSignature
   ) => void
+  didChangeWatchedFile?: (this: void, event: FileEvent, next: DidChangeWatchedFileSignature) => void
 }
 
 export type WorkspaceMiddleware = _WorkspaceMiddleware & ConfigurationWorkspaceMiddleware & WorkspaceFolderWorkspaceMiddleware
@@ -629,6 +664,12 @@ export interface _Middleware {
     token: CancellationToken,
     next: ResolveDocumentLinkSignature
   ) => ProviderResult<DocumentLink>
+  executeCommand?: (
+    this: void,
+    command: string,
+    args: any[],
+    next: ExecuteCommandSignature
+  ) => ProviderResult<any>
   workspace?: WorkspaceMiddleware
 }
 
@@ -659,6 +700,7 @@ export interface LanguageClientOptions {
   stdioEncoding?: string
   initializationOptions?: any | (() => any)
   initializationFailedHandler?: InitializationFailedHandler
+  progressOnInitialization?: boolean
   errorHandler?: ErrorHandler
   middleware?: Middleware
   workspaceFolder?: WorkspaceFolder
@@ -678,6 +720,7 @@ interface ResolvedClientOptions {
   stdioEncoding: string
   initializationOptions?: any | (() => any)
   initializationFailedHandler?: InitializationFailedHandler
+  progressOnInitialization: boolean
   errorHandler: ErrorHandler
   middleware: Middleware
   workspaceFolder?: WorkspaceFolder
@@ -703,7 +746,7 @@ export enum ClientState {
   Stopped
 }
 
-const SupporedSymbolKinds: SymbolKind[] = [
+const SupportedSymbolKinds: SymbolKind[] = [
   SymbolKind.File,
   SymbolKind.Module,
   SymbolKind.Namespace,
@@ -758,6 +801,10 @@ const SupportedCompletionItemKinds: CompletionItemKind[] = [
   CompletionItemKind.Event,
   CompletionItemKind.Operator,
   CompletionItemKind.TypeParameter
+]
+
+const SupportedSymbolTags: SymbolTag[] = [
+  SymbolTag.Deprecated
 ]
 
 function ensure<T, K extends keyof T>(target: T, key: K): T[K] {
@@ -868,6 +915,13 @@ export interface DynamicFeature<T> {
   dispose(): void
 }
 
+export interface NotificationFeature<T extends Function> {
+	/**
+	 * Triggers the corresponding RPC method.
+	 */
+  getProvider(document: TextDocument): { send: T }
+}
+
 namespace DynamicFeature {
   export function is<T>(value: any): value is DynamicFeature<T> {
     let candidate: DynamicFeature<T> = value
@@ -876,7 +930,7 @@ namespace DynamicFeature {
       Is.func(candidate.register) &&
       Is.func(candidate.unregister) &&
       Is.func(candidate.dispose) &&
-      candidate.messages != null
+      candidate.messages !== void 0
     )
   }
 }
@@ -885,26 +939,8 @@ interface CreateParamsSignature<E, P> {
   (data: E): P
 }
 
-class OnReady {
-  private _used: boolean
-  constructor(private _resolve: () => void, private _reject: (error: any) => void) {
-    this._used = false
-  }
-  public get isUsed(): boolean {
-    return this._used
-  }
-  public resolve(): void {
-    this._used = true
-    this._resolve()
-  }
-  public reject(error: any): void {
-    this._used = true
-    this._reject(error)
-  }
-}
-
 abstract class DocumentNotifiactions<P, E>
-  implements DynamicFeature<TextDocumentRegistrationOptions> {
+  implements DynamicFeature<TextDocumentRegistrationOptions>, NotificationFeature<(data: E) => void> {
   private _listener: Disposable | undefined
   protected _selectors: Map<string, DocumentSelector> = new Map()
 
@@ -986,6 +1022,19 @@ abstract class DocumentNotifiactions<P, E>
       this._listener.dispose()
       this._listener = undefined
     }
+  }
+
+  public getProvider(document: TextDocument): { send: (data: E) => void } {
+    for (const selector of this._selectors.values()) {
+      if (workspace.match(selector, document)) {
+        return {
+          send: (data: E) => {
+            this.callback(data)
+          }
+        }
+      }
+    }
+    throw new Error(`No provider available for the given text document`)
   }
 }
 
@@ -1149,7 +1198,7 @@ interface DidChangeTextDocumentData {
 }
 
 class DidChangeTextDocumentFeature
-  implements DynamicFeature<TextDocumentChangeRegistrationOptions> {
+  implements DynamicFeature<TextDocumentChangeRegistrationOptions>, NotificationFeature<(event: DidChangeTextDocumentParams) => void> {
   private _listener: Disposable | undefined
   private _changeData: Map<string, DidChangeTextDocumentData> = new Map<string, DidChangeTextDocumentData>()
 
@@ -1168,7 +1217,7 @@ class DidChangeTextDocumentFeature
     if (
       documentSelector &&
       textDocumentSyncOptions &&
-      textDocumentSyncOptions.change != null &&
+      textDocumentSyncOptions.change !== void 0 &&
       textDocumentSyncOptions.change !== TextDocumentSyncKind.None
     ) {
       this.register(this.messages, {
@@ -1257,6 +1306,19 @@ class DidChangeTextDocumentFeature
       this._listener.dispose()
       this._listener = undefined
     }
+  }
+
+  public getProvider(document: TextDocument): { send: (event: DidChangeTextDocumentParams) => void } {
+    for (const changeData of this._changeData.values()) {
+      if (workspace.match(changeData.documentSelector, document)) {
+        return {
+          send: (event: DidChangeTextDocumentParams): void => {
+            this.callback(event)
+          }
+        }
+      }
+    }
+    throw new Error(`No provider available for the given text document`)
   }
 }
 
@@ -1583,10 +1645,23 @@ class FileSystemWatcherFeature
   }
 }
 
+interface TextDocumentFeatureRegistration<RO, PR> {
+  disposable: Disposable
+  data: RegistrationData<RO>
+  provider: PR
+}
+
+export interface TextDocumentProviderFeature<T> {
+	/**
+	 * Triggers the corresponding RPC method.
+	 */
+  getProvider(textDocument: TextDocument): T
+}
+
 export abstract class TextDocumentFeature<
-  T extends TextDocumentRegistrationOptions
-  > implements DynamicFeature<T> {
-  protected _providers: Map<string, Disposable> = new Map<string, Disposable>()
+  PO, RO extends TextDocumentRegistrationOptions & PO, PR
+  > implements DynamicFeature<RO> {
+  private _registrations: Map<string, TextDocumentFeatureRegistration<RO, PR>> = new Map()
 
   constructor(
     protected _client: BaseLanguageClient,
@@ -1604,7 +1679,7 @@ export abstract class TextDocumentFeature<
     documentSelector: DocumentSelector
   ): void
 
-  public register(message: RPCMessageType, data: RegistrationData<T>): void {
+  public register(message: RPCMessageType, data: RegistrationData<RO>): void {
     if (message.method !== this.messages.method) {
       throw new Error(
         `Register called on wrong feature. Requested ${
@@ -1615,31 +1690,74 @@ export abstract class TextDocumentFeature<
     if (!data.registerOptions.documentSelector) {
       return
     }
-    let provider = this.registerLanguageProvider(data.registerOptions)
-    if (provider) {
-      this._providers.set(data.id, provider)
-    }
+    let registration = this.registerLanguageProvider(data.registerOptions)
+    this._registrations.set(data.id, { disposable: registration[0], data, provider: registration[1] })
   }
 
-  protected abstract registerLanguageProvider(languageIds: T): Disposable
+  protected abstract registerLanguageProvider(options: RO): [Disposable, PR]
 
   public unregister(id: string): void {
-    let provider = this._providers.get(id)
-    if (provider) {
-      provider.dispose()
+    let registration = this._registrations.get(id)
+    if (registration) {
+      registration.disposable.dispose()
     }
   }
 
   public dispose(): void {
-    this._providers.forEach(value => {
-      value.dispose()
+    this._registrations.forEach(value => {
+      value.disposable.dispose()
     })
-    this._providers.clear()
+    this._registrations.clear()
+  }
+
+  protected getRegistration(documentSelector: DocumentSelector | undefined, capability: undefined | PO | (RO & StaticRegistrationOptions)): [string | undefined, (RO & { documentSelector: DocumentSelector }) | undefined] {
+    if (!capability) {
+      return [undefined, undefined]
+    } else if (TextDocumentRegistrationOptions.is(capability)) {
+      const id = StaticRegistrationOptions.hasId(capability) ? capability.id : UUID.generateUuid()
+      const selector = capability.documentSelector || documentSelector
+      if (selector) {
+        return [id, Object.assign({}, capability, { documentSelector: selector })]
+      }
+    } else if (Is.boolean(capability) && capability === true || WorkDoneProgressOptions.is(capability)) {
+      if (!documentSelector) {
+        return [undefined, undefined]
+      }
+      let options: RO & { documentSelector: DocumentSelector } = (Is.boolean(capability) && capability === true ? { documentSelector } : Object.assign({}, capability, { documentSelector })) as any
+      return [UUID.generateUuid(), options]
+    }
+    return [undefined, undefined]
+  }
+
+  protected getRegistrationOptions(documentSelector: DocumentSelector | undefined, capability: undefined | PO): (RO & { documentSelector: DocumentSelector }) | undefined {
+    if (!documentSelector || !capability) {
+      return undefined
+    }
+    return (Is.boolean(capability) && capability === true ? { documentSelector } : Object.assign({}, capability, { documentSelector })) as RO & { documentSelector: DocumentSelector }
+  }
+
+  public getProvider(textDocument: TextDocument): PR {
+    for (const registration of this._registrations.values()) {
+      let selector = registration.data.registerOptions.documentSelector
+      if (selector !== null && workspace.match(selector, textDocument)) {
+        return registration.provider
+      }
+    }
+    throw new Error(`The feature has no registration for the provided text document ${textDocument.uri.toString()}`)
   }
 }
 
-abstract class WorkspaceFeature<T> implements DynamicFeature<T> {
-  protected _providers: Map<string, Disposable> = new Map<string, Disposable>()
+export interface WorkspaceProviderFeature<PR> {
+  getProviders(): PR[]
+}
+
+interface WorkspaceFeatureRegistration<PR> {
+  disposable: Disposable
+  provider: PR
+}
+
+abstract class WorkspaceFeature<RO, PR> implements DynamicFeature<RO> {
+  protected _registrations: Map<string, WorkspaceFeatureRegistration<PR>> = new Map()
 
   constructor(
     protected _client: BaseLanguageClient,
@@ -1657,38 +1775,45 @@ abstract class WorkspaceFeature<T> implements DynamicFeature<T> {
     documentSelector: DocumentSelector | undefined
   ): void
 
-  public register(message: RPCMessageType, data: RegistrationData<T>): void {
+  public register(message: RPCMessageType, data: RegistrationData<RO>): void {
     if (message.method !== this.messages.method) {
-      throw new Error(
-        `Register called on wrong feature. Requested ${message.method} but reached feature ${this.messages.method}`
-      )
+      throw new Error(`Register called on wrong feature. Requested ${message.method} but reached feature ${this.messages.method}`)
     }
-    let provider = this.registerLanguageProvider(data.registerOptions)
-    if (provider) {
-      this._providers.set(data.id, provider)
-    }
+    const registration = this.registerLanguageProvider(data.registerOptions)
+    this._registrations.set(data.id, { disposable: registration[0], provider: registration[1] })
   }
 
-  protected abstract registerLanguageProvider(options: T): Disposable
+  protected abstract registerLanguageProvider(options: RO): [Disposable, PR]
 
   public unregister(id: string): void {
-    let provider = this._providers.get(id)
-    if (provider) {
-      provider.dispose()
+    const registration = this._registrations.get(id)
+    if (registration) {
+      registration.disposable.dispose()
     }
   }
 
   public dispose(): void {
-    this._providers.forEach(value => {
-      value.dispose()
+    this._registrations.forEach(value => {
+      value.disposable.dispose()
     })
-    this._providers.clear()
+    this._registrations.clear()
+  }
+
+  public getProviders(): PR[] {
+    const result: PR[] = []
+    for (const registration of this._registrations.values()) {
+      result.push(registration.provider)
+    }
+    return result
   }
 }
 
-class CompletionItemFeature extends TextDocumentFeature<
-  CompletionRegistrationOptions
-  > {
+export interface ProvideResolveFeature<T1 extends Function, T2 extends Function> {
+  provide: T1
+  resolve: T2
+}
+
+class CompletionItemFeature extends TextDocumentFeature<CompletionOptions, CompletionRegistrationOptions, CompletionItemProvider> {
   constructor(client: BaseLanguageClient) {
     super(client, CompletionRequest.type)
   }
@@ -1702,7 +1827,8 @@ class CompletionItemFeature extends TextDocumentFeature<
       commitCharactersSupport: true,
       documentationFormat: [MarkupKind.Markdown, MarkupKind.PlainText],
       deprecatedSupport: true,
-      preselectSupport: true
+      preselectSupport: true,
+      // tagSupport: { valueSet: [CompletionItemTag.Deprecated] },
     }
     completion.completionItemKind = { valueSet: SupportedCompletionItemKinds }
   }
@@ -1711,109 +1837,76 @@ class CompletionItemFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.completionProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.completionProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign(
-        {},
-        { documentSelector: documentSelector },
-        capabilities.completionProvider
-      )
+      registerOptions: options
     })
   }
 
-  protected registerLanguageProvider(
-    options: CompletionRegistrationOptions
-  ): Disposable {
+  protected registerLanguageProvider(options: CompletionRegistrationOptions): [Disposable, CompletionItemProvider] {
     let triggerCharacters = options.triggerCharacters || []
-    let client = this._client
-    let provideCompletionItems: ProvideCompletionItemsSignature = (
-      document,
-      position,
-      context,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          CompletionRequest.type,
-          cv.asCompletionParams(
-            document,
-            position,
-            context
-          ),
-          token
-        )
-        .then(result => {
-          // logger.debug('result', result)
-          return result
-        }, error => {
-          client.logFailedRequest(CompletionRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let resolveCompletionItem: ResolveCompletionItemSignature = (
-      item,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          CompletionResolveRequest.type,
-          item,
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(CompletionResolveRequest.type, error)
-          return Promise.resolve(item)
-        })
+    let allCommitCharacters = options.allCommitCharacters || []
+    let priority = (options as any).priority as number
+    const provider: CompletionItemProvider = {
+      provideCompletionItems: (document: TextDocument, position: Position, token: CancellationToken, context: CompletionContext): ProviderResult<CompletionList | CompletionItem[]> => {
+        const client = this._client
+        const middleware = this._client.clientOptions.middleware!
+        const provideCompletionItems: ProvideCompletionItemsSignature = (document, position, context, token) => {
+          return client.sendRequest(
+            CompletionRequest.type,
+            cv.asCompletionParams(document, position, context),
+            token
+          ).then(result => result, error => {
+            client.logFailedRequest(CompletionRequest.type, error)
+            return Promise.resolve([])
+          })
+        }
+
+        return middleware.provideCompletionItem
+          ? middleware.provideCompletionItem(document, position, context, token, provideCompletionItems)
+          : provideCompletionItems(document, position, context, token)
+      },
+      resolveCompletionItem: options.resolveProvider
+        ? (item: CompletionItem, token: CancellationToken): ProviderResult<CompletionItem> => {
+          const client = this._client
+          const middleware = this._client.clientOptions.middleware!
+          const resolveCompletionItem: ResolveCompletionItemSignature = (item, token) => {
+            return client.sendRequest(
+              CompletionResolveRequest.type,
+              item,
+              token
+            ).then(res => res, error => {
+              client.logFailedRequest(CompletionResolveRequest.type, error)
+              return Promise.resolve(item)
+            })
+          }
+
+          return middleware.resolveCompletionItem
+            ? middleware.resolveCompletionItem(item, token, resolveCompletionItem)
+            : resolveCompletionItem(item, token)
+        }
+        : undefined
     }
 
-    let middleware = this._client.clientOptions.middleware!
-    let languageIds = cv.asLanguageIds(options.documentSelector!)
-    return languages.registerCompletionItemProvider(
+    const languageIds = cv.asLanguageIds(options.documentSelector!)
+    const disposable = languages.registerCompletionItemProvider(
       this._client.id,
       'LS',
       languageIds,
-      {
-        provideCompletionItems: (
-          document: TextDocument,
-          position: Position,
-          token: CancellationToken,
-          context: CompletionContext
-        ): ProviderResult<CompletionList | CompletionItem[]> => {
-          return middleware.provideCompletionItem
-            ? middleware.provideCompletionItem(
-              document,
-              position,
-              context,
-              token,
-              provideCompletionItems
-            )
-            : provideCompletionItems(document, position, context, token)
-        },
-        resolveCompletionItem: options.resolveProvider
-          ? (
-            item: CompletionItem,
-            token: CancellationToken
-          ): ProviderResult<CompletionItem> => {
-            return middleware.resolveCompletionItem
-              ? middleware.resolveCompletionItem(
-                item,
-                token,
-                resolveCompletionItem
-              )
-              : resolveCompletionItem(item, token)
-          }
-          : undefined
-      },
-      triggerCharacters
-    )
+      provider,
+      triggerCharacters,
+      priority,
+      allCommitCharacters)
+    return [disposable, provider]
   }
 }
 
 class HoverFeature extends TextDocumentFeature<
-  TextDocumentRegistrationOptions
+  boolean | HoverOptions, HoverRegistrationOptions, HoverProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, HoverRequest.type)
@@ -1832,52 +1925,46 @@ class HoverFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.hoverProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.hoverProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
-    options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideHover: ProvideHoverSignature = (document, position, token) => {
-      return client
-        .sendRequest(
-          HoverRequest.type,
-          cv.asTextDocumentPositionParams(
-            document,
-            position
-          ),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(HoverRequest.type, error)
-          return Promise.resolve(null)
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerHoverProvider(
-      options.documentSelector!, {
-        provideHover: (
-          document: TextDocument,
-          position: Position,
-          token: CancellationToken
-        ): ProviderResult<Hover> => {
-          return middleware.provideHover
-            ? middleware.provideHover(document, position, token, provideHover)
-            : provideHover(document, position, token)
+    options: HoverRegistrationOptions
+  ): [Disposable, HoverProvider] {
+    const provider: HoverProvider = {
+      provideHover: (document, position, token) => {
+        const client = this._client
+        const provideHover: ProvideHoverSignature = (document, position, token) => {
+          return client.sendRequest(
+            HoverRequest.type,
+            cv.asTextDocumentPositionParams(document, position),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(HoverRequest.type, error)
+            return Promise.resolve(null)
+          })
         }
-      })
+
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideHover
+          ? middleware.provideHover(document, position, token, provideHover)
+          : provideHover(document, position, token)
+      }
+    }
+
+    return [languages.registerHoverProvider(options.documentSelector!, provider), provider]
   }
 }
 
 class SignatureHelpFeature extends TextDocumentFeature<
-  SignatureHelpRegistrationOptions
+  SignatureHelpOptions, SignatureHelpRegistrationOptions, SignatureHelpProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, SignatureHelpRequest.type)
@@ -1886,6 +1973,7 @@ class SignatureHelpFeature extends TextDocumentFeature<
   public fillClientCapabilities(capabilites: ClientCapabilities): void {
     let config = ensure(ensure(capabilites, 'textDocument')!, 'signatureHelp')!
     config.dynamicRegistration = true
+    // config.contextSupport = true // TODO context and meta support
     config.signatureInformation = {
       documentationFormat: [MarkupKind.Markdown, MarkupKind.PlainText],
       parameterInformation: {
@@ -1898,69 +1986,49 @@ class SignatureHelpFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.signatureHelpProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.signatureHelpProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign(
-        {},
-        { documentSelector: documentSelector },
-        capabilities.signatureHelpProvider
-      )
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: SignatureHelpRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let providerSignatureHelp: ProvideSignatureHelpSignature = (
-      document,
-      position,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          SignatureHelpRequest.type,
-          cv.asTextDocumentPositionParams(
-            document,
-            position
-          ),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(SignatureHelpRequest.type, error)
-          return Promise.resolve(null)
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    let triggerCharacters = options.triggerCharacters || []
-    return languages.registerSignatureHelpProvider(
-      options.documentSelector!,
-      {
-        provideSignatureHelp: (
-          document: TextDocument,
-          position: Position,
-          token: CancellationToken
-        ): ProviderResult<SignatureHelp> => {
-          return middleware.provideSignatureHelp
-            ? middleware.provideSignatureHelp(
-              document,
-              position,
-              token,
-              providerSignatureHelp
-            )
-            : providerSignatureHelp(document, position, token)
+  ): [Disposable, SignatureHelpProvider] {
+    const provider: SignatureHelpProvider = {
+      provideSignatureHelp: (document, position, token) => {
+        const client = this._client
+        const providerSignatureHelp: ProvideSignatureHelpSignature = (document, position, token) => {
+          return client.sendRequest(
+            SignatureHelpRequest.type,
+            cv.asTextDocumentPositionParams(document, position),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(SignatureHelpRequest.type, error)
+            return Promise.resolve(null)
+          }
+          )
         }
-      },
-      triggerCharacters
-    )
+
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideSignatureHelp
+          ? middleware.provideSignatureHelp(document, position, token, providerSignatureHelp)
+          : providerSignatureHelp(document, position, token)
+      }
+    }
+
+    const triggerCharacters = options.triggerCharacters || []
+    const disposable = languages.registerSignatureHelpProvider(options.documentSelector!, provider, triggerCharacters)
+    return [disposable, provider]
   }
 }
 
 class DefinitionFeature extends TextDocumentFeature<
-  TextDocumentRegistrationOptions
+  boolean | DefinitionOptions, DefinitionRegistrationOptions, DefinitionProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, DefinitionRequest.type)
@@ -1976,61 +2044,45 @@ class DefinitionFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.definitionProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.definitionProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
-    options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDefinition: ProvideDefinitionSignature = (
-      document,
-      position,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          DefinitionRequest.type,
-          cv.asTextDocumentPositionParams(
-            document,
-            position
-          ),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(DefinitionRequest.type, error)
-          return Promise.resolve(null)
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDefinitionProvider(
-      options.documentSelector!, {
-        provideDefinition: (
-          document: TextDocument,
-          position: Position,
-          token: CancellationToken
-        ): ProviderResult<Definition> => {
-          return middleware.provideDefinition
-            ? middleware.provideDefinition(
-              document,
-              position,
-              token,
-              provideDefinition
-            )
-            : provideDefinition(document, position, token)
+    options: DefinitionRegistrationOptions
+  ): [Disposable, DefinitionProvider] {
+    const provider: DefinitionProvider = {
+      provideDefinition: (document, position, token) => {
+        const client = this._client
+        const provideDefinition: ProvideDefinitionSignature = (document, position, token) => {
+          return client.sendRequest(
+            DefinitionRequest.type,
+            cv.asTextDocumentPositionParams(document, position),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(DefinitionRequest.type, error)
+            return Promise.resolve(null)
+          })
         }
-      })
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDefinition
+          ? middleware.provideDefinition(document, position, token, provideDefinition)
+          : provideDefinition(document, position, token)
+      }
+    }
+
+    return [languages.registerDefinitionProvider(options.documentSelector!, provider), provider]
   }
 }
 
 class ReferencesFeature extends TextDocumentFeature<
-  TextDocumentRegistrationOptions
+  boolean | ReferenceOptions, ReferenceRegistrationOptions, ReferenceProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, ReferencesRequest.type)
@@ -2047,65 +2099,44 @@ class ReferencesFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.referencesProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.referencesProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let providerReferences: ProvideReferencesSignature = (
-      document,
-      position,
-      options,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          ReferencesRequest.type,
-          cv.asReferenceParams(
-            document,
-            position,
-            options
-          ),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(ReferencesRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerReferencesProvider(
-      options.documentSelector!, {
-        provideReferences: (
-          document: TextDocument,
-          position: Position,
-          options: { includeDeclaration: boolean },
-          token: CancellationToken
-        ): ProviderResult<Location[]> => {
-          return middleware.provideReferences
-            ? middleware.provideReferences(
-              document,
-              position,
-              options,
-              token,
-              providerReferences
-            )
-            : providerReferences(document, position, options, token)
+  ): [Disposable, ReferenceProvider] {
+    const provider: ReferenceProvider = {
+      provideReferences: (document, position, options, token) => {
+        const client = this._client
+        const _providerReferences: ProvideReferencesSignature = (document, position, options, token) => {
+          return client.sendRequest(
+            ReferencesRequest.type,
+            cv.asReferenceParams(document, position, options),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(ReferencesRequest.type, error)
+            return Promise.resolve([])
+          })
         }
-      })
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideReferences
+          ? middleware.provideReferences(document, position, options, token, _providerReferences)
+          : _providerReferences(document, position, options, token)
+      }
+    }
+    return [languages.registerReferencesProvider(options.documentSelector!, provider), provider]
   }
 }
 
 class DocumentHighlightFeature extends TextDocumentFeature<
-  TextDocumentRegistrationOptions
+  boolean | DocumentHighlightOptions, DocumentHighlightRegistrationOptions, DocumentHighlightProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, DocumentHighlightRequest.type)
@@ -2122,63 +2153,44 @@ class DocumentHighlightFeature extends TextDocumentFeature<
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.documentHighlightProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentHighlightProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDocumentHighlights: ProvideDocumentHighlightsSignature = (
-      document,
-      position,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          DocumentHighlightRequest.type,
-          cv.asTextDocumentPositionParams(
-            document,
-            position
-          ),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(DocumentHighlightRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDocumentHighlightProvider(
-      options.documentSelector!,
-      {
-        provideDocumentHighlights: (
-          document: TextDocument,
-          position: Position,
-          token: CancellationToken
-        ): ProviderResult<DocumentHighlight[]> => {
-          return middleware.provideDocumentHighlights
-            ? middleware.provideDocumentHighlights(
-              document,
-              position,
-              token,
-              provideDocumentHighlights
-            )
-            : provideDocumentHighlights(document, position, token)
+  ): [Disposable, DocumentHighlightProvider] {
+    const provider: DocumentHighlightProvider = {
+      provideDocumentHighlights: (document, position, token) => {
+        const client = this._client
+        const _provideDocumentHighlights: ProvideDocumentHighlightsSignature = (document, position, token) => {
+          return client.sendRequest(
+            DocumentHighlightRequest.type,
+            cv.asTextDocumentPositionParams(document, position),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(DocumentHighlightRequest.type, error)
+            return Promise.resolve([])
+          })
         }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDocumentHighlights
+          ? middleware.provideDocumentHighlights(document, position, token, _provideDocumentHighlights)
+          : _provideDocumentHighlights(document, position, token)
       }
-    )
+    }
+    return [languages.registerDocumentHighlightProvider(options.documentSelector!, provider), provider]
   }
 }
 
 class DocumentSymbolFeature extends TextDocumentFeature<
-  TextDocumentRegistrationOptions
+  boolean | DocumentSymbolOptions, DocumentSymbolRegistrationOptions, DocumentSymbolProvider
   > {
   constructor(client: BaseLanguageClient) {
     super(client, DocumentSymbolRequest.type)
@@ -2191,62 +2203,73 @@ class DocumentSymbolFeature extends TextDocumentFeature<
     )!
     symbolCapabilities.dynamicRegistration = true
     symbolCapabilities.symbolKind = {
-      valueSet: SupporedSymbolKinds
+      valueSet: SupportedSymbolKinds
     }
+    symbolCapabilities.hierarchicalDocumentSymbolSupport = true
   }
 
   public initialize(
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.documentSymbolProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentSymbolProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDocumentSymbols: ProvideDocumentSymbolsSignature = (
-      document,
-      token
-    ) => {
-      return client
-        .sendRequest(
-          DocumentSymbolRequest.type,
-          cv.asDocumentSymbolParams(document),
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(DocumentSymbolRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDocumentSymbolProvider(
-      options.documentSelector!, {
-        provideDocumentSymbols: (
-          document: TextDocument,
-          token: CancellationToken
-        ): ProviderResult<SymbolInformation[] | DocumentSymbol[]> => {
-          return middleware.provideDocumentSymbols
-            ? middleware.provideDocumentSymbols(
-              document,
-              token,
-              provideDocumentSymbols
-            )
-            : provideDocumentSymbols(document, token)
+  ): [Disposable, DocumentSymbolProvider] {
+    const provider: DocumentSymbolProvider = {
+      provideDocumentSymbols: (document, token) => {
+        const client = this._client
+        const _provideDocumentSymbols: ProvideDocumentSymbolsSignature = (document, token) => {
+          return client.sendRequest(
+            DocumentSymbolRequest.type,
+            cv.asDocumentSymbolParams(document),
+            token
+          ).then(
+            (data) => {
+              if (data === null) {
+                return undefined
+              }
+              if (data.length === 0) {
+                return []
+              } else {
+                let element = data[0]
+                // TODO
+                if (DocumentSymbol.is(element)) {
+                  return data as DocumentSymbol[]
+                } else {
+                  return data as SymbolInformation[]
+                }
+              }
+            },
+            (error) => {
+              client.logFailedRequest(DocumentSymbolRequest.type, error)
+              return Promise.resolve([])
+            }
+          )
         }
-      })
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDocumentSymbols
+          ? middleware.provideDocumentSymbols(document, token, _provideDocumentSymbols)
+          : _provideDocumentSymbols(document, token)
+      }
+    }
+    return [languages.registerDocumentSymbolProvider(options.documentSelector!, provider), provider]
   }
 }
 
-class WorkspaceSymbolFeature extends WorkspaceFeature<TextDocumentRegistrationOptions> {
+class WorkspaceSymbolFeature extends WorkspaceFeature<WorkspaceSymbolRegistrationOptions, WorkspaceSymbolProvider
+  > {
+  private documentSelector: DocumentSelector
+
   constructor(client: BaseLanguageClient) {
     super(client, WorkspaceSymbolRequest.type)
   }
@@ -2258,7 +2281,7 @@ class WorkspaceSymbolFeature extends WorkspaceFeature<TextDocumentRegistrationOp
     )!
     symbolCapabilities.dynamicRegistration = true
     symbolCapabilities.symbolKind = {
-      valueSet: SupporedSymbolKinds
+      valueSet: SupportedSymbolKinds
     }
   }
 
@@ -2266,48 +2289,39 @@ class WorkspaceSymbolFeature extends WorkspaceFeature<TextDocumentRegistrationOp
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector | undefined
   ): void {
+    this.documentSelector = documentSelector
     if (!capabilities.workspaceSymbolProvider) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: capabilities.workspaceSymbolProvider === true ? { workDoneProgress: false } : capabilities.workspaceSymbolProvider
     })
   }
 
-  protected registerLanguageProvider(options: TextDocumentRegistrationOptions): Disposable {
-    let client = this._client
-    let provideWorkspaceSymbols: ProvideWorkspaceSymbolsSignature = (
-      query,
-      token
-    ) => {
-      return client
-        .sendRequest(WorkspaceSymbolRequest.type, { query }, token)
-        .then(res => res, error => {
-          client.logFailedRequest(WorkspaceSymbolRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerWorkspaceSymbolProvider(
-      options.documentSelector!, {
-        provideWorkspaceSymbols: (
-          query: string,
-          token: CancellationToken
-        ): ProviderResult<SymbolInformation[]> => {
-          return middleware.provideWorkspaceSymbols
-            ? middleware.provideWorkspaceSymbols(
-              query,
-              token,
-              provideWorkspaceSymbols
-            )
-            : provideWorkspaceSymbols(query, token)
+  protected registerLanguageProvider(_options: WorkspaceSymbolRegistrationOptions): [Disposable, WorkspaceSymbolProvider] {
+    const provider: WorkspaceSymbolProvider = {
+      provideWorkspaceSymbols: (query, token) => {
+        const client = this._client
+        const provideWorkspaceSymbols: ProvideWorkspaceSymbolsSignature = (query, token) => {
+          return client.sendRequest(WorkspaceSymbolRequest.type, { query }, token).then(
+            res => res,
+            error => {
+              client.logFailedRequest(WorkspaceSymbolRequest.type, error)
+              return Promise.resolve([])
+            })
         }
-      })
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideWorkspaceSymbols
+          ? middleware.provideWorkspaceSymbols(query, token, provideWorkspaceSymbols)
+          : provideWorkspaceSymbols(query, token)
+      }
+    }
+    return [languages.registerWorkspaceSymbolProvider(this.documentSelector, provider), provider]
   }
 }
 
-class CodeActionFeature extends TextDocumentFeature<CodeActionRegistrationOptions> {
+class CodeActionFeature extends TextDocumentFeature<boolean | CodeActionOptions, CodeActionRegistrationOptions, CodeActionProvider> {
   constructor(client: BaseLanguageClient) {
     super(client, CodeActionRequest.type)
   }
@@ -2315,10 +2329,11 @@ class CodeActionFeature extends TextDocumentFeature<CodeActionRegistrationOption
   public fillClientCapabilities(capabilites: ClientCapabilities): void {
     const cap = ensure(ensure(capabilites, 'textDocument')!, 'codeAction')!
     cap.dynamicRegistration = true
+    cap.isPreferredSupport = true
     cap.codeActionLiteralSupport = {
       codeActionKind: {
         valueSet: [
-          '',
+          CodeActionKind.Empty,
           CodeActionKind.QuickFix,
           CodeActionKind.Refactor,
           CodeActionKind.RefactorExtract,
@@ -2335,74 +2350,56 @@ class CodeActionFeature extends TextDocumentFeature<CodeActionRegistrationOption
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.codeActionProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.codeActionProvider)
+    if (!options) {
       return
     }
-    let codeActionKinds: CodeActionKind[] | undefined
-    if (!Is.boolean(capabilities.codeActionProvider)) {
-      codeActionKinds = capabilities.codeActionProvider.codeActionKinds
-    }
-
 
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector, codeActionKinds })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: CodeActionRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideCodeActions: ProvideCodeActionsSignature = (
-      document,
-      range,
-      context,
-      token
-    ) => {
-      let params: CodeActionParams = {
-        textDocument: {
-          uri: document.uri
-        },
-        range,
-        context,
+  ): [Disposable, CodeActionProvider] {
+    const provider: CodeActionProvider = {
+      provideCodeActions: (document, range, context, token) => {
+        const client = this._client
+        const _provideCodeActions: ProvideCodeActionsSignature = (document, range, context, token) => {
+          const params: CodeActionParams = {
+            textDocument: {
+              uri: document.uri
+            },
+            range,
+            context,
+          }
+          return client.sendRequest(CodeActionRequest.type, params, token).then(
+            (values) => {
+              if (values === null) {
+                return undefined
+              }
+              return values
+            },
+            (error) => {
+              client.logFailedRequest(CodeActionRequest.type, error)
+              return Promise.resolve([])
+            }
+          )
+        }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideCodeActions
+          ? middleware.provideCodeActions(document, range, context, token, _provideCodeActions)
+          : _provideCodeActions(document, range, context, token)
       }
-      return client.sendRequest(CodeActionRequest.type, params, token).then(
-        values => {
-          if (values == null) return null
-          return values
-        },
-        error => {
-          client.logFailedRequest(CodeActionRequest.type, error)
-          return Promise.resolve([])
-        }
-      )
     }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerCodeActionProvider(
-      options.documentSelector,
-      {
-        provideCodeActions: (
-          document: TextDocument,
-          range: Range,
-          context: CodeActionContext,
-          token: CancellationToken
-        ): ProviderResult<(Command | CodeAction)[]> => {
-          return middleware.provideCodeActions
-            ? middleware.provideCodeActions(
-              document,
-              range,
-              context,
-              token,
-              provideCodeActions
-            )
-            : provideCodeActions(document, range, context, token)
-        }
-      }, client.id, options.codeActionKinds)
+
+    return [languages.registerCodeActionProvider(options.documentSelector, provider, this._client.id, options.codeActionKinds), provider]
   }
 }
 
-class CodeLensFeature extends TextDocumentFeature<CodeLensRegistrationOptions> {
+class CodeLensFeature extends TextDocumentFeature<CodeLensOptions, CodeLensRegistrationOptions, CodeLensProvider> {
   constructor(client: BaseLanguageClient) {
     super(client, CodeLensRequest.type)
   }
@@ -2418,72 +2415,65 @@ class CodeLensFeature extends TextDocumentFeature<CodeLensRegistrationOptions> {
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.codeLensProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.codeLensProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign(
-        {},
-        { documentSelector: documentSelector },
-        capabilities.codeLensProvider
-      )
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: CodeLensRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideCodeLenses: ProvideCodeLensesSignature = (document, token) => {
-      return client
-        .sendRequest(
-          CodeLensRequest.type,
-          cv.asCodeLensParams(document),
-          token
-        ).then(res => res, error => {
-          client.logFailedRequest(CodeLensRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let resolveCodeLens: ResolveCodeLensSignature = (codeLens, token) => {
-      return client
-        .sendRequest(
-          CodeLensResolveRequest.type,
-          codeLens,
-          token
-        )
-        .then(res => res, error => {
-          client.logFailedRequest(CodeLensResolveRequest.type, error)
-          return codeLens
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerCodeLensProvider(
-      options.documentSelector, {
-        provideCodeLenses: (
-          document: TextDocument,
-          token: CancellationToken
-        ): ProviderResult<CodeLens[]> => {
-          return middleware.provideCodeLenses
-            ? middleware.provideCodeLenses(document, token, provideCodeLenses)
-            : provideCodeLenses(document, token)
-        },
-        resolveCodeLens: options.resolveProvider
-          ? (
-            codeLens: CodeLens,
-            token: CancellationToken
-          ): ProviderResult<CodeLens> => {
-            return middleware.resolveCodeLens
-              ? middleware.resolveCodeLens(codeLens, token, resolveCodeLens)
-              : resolveCodeLens(codeLens, token)
+  ): [Disposable, CodeLensProvider] {
+    const provider: CodeLensProvider = {
+      provideCodeLenses: (document, token) => {
+        const client = this._client
+        const provideCodeLenses: ProvideCodeLensesSignature = (document, token) => {
+          return client.sendRequest(
+            CodeLensRequest.type,
+            cv.asCodeLensParams(document),
+            token
+          ).then(res => res, error => {
+            client.logFailedRequest(CodeLensRequest.type, error)
+            return Promise.resolve([])
+          })
+        }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideCodeLenses
+          ? middleware.provideCodeLenses(document, token, provideCodeLenses)
+          : provideCodeLenses(document, token)
+      },
+      resolveCodeLens: (options.resolveProvider)
+        ? (codeLens: CodeLens, token: CancellationToken): ProviderResult<CodeLens> => {
+          const client = this._client
+          const resolveCodeLens: ResolveCodeLensSignature = (codeLens, token) => {
+            return client.sendRequest(
+              CodeLensResolveRequest.type,
+              codeLens,
+              token
+            ).then(res => res, error => {
+              client.logFailedRequest(CodeLensResolveRequest.type, error)
+              return codeLens
+            })
           }
-          : undefined
-      })
+          const middleware = client.clientOptions.middleware!
+          return middleware.resolveCodeLens
+            ? middleware.resolveCodeLens(codeLens, token, resolveCodeLens)
+            : resolveCodeLens(codeLens, token)
+        }
+        : undefined
+    }
+
+    return [languages.registerCodeLensProvider(options.documentSelector, provider), provider]
   }
 }
 
-class DocumentFormattingFeature extends TextDocumentFeature<TextDocumentRegistrationOptions> {
+class DocumentFormattingFeature extends TextDocumentFeature<
+  boolean | DocumentFormattingOptions, DocumentHighlightRegistrationOptions, DocumentFormattingEditProvider
+  > {
 
   constructor(client: BaseLanguageClient) {
     super(client, DocumentFormattingRequest.type)
@@ -2500,61 +2490,46 @@ class DocumentFormattingFeature extends TextDocumentFeature<TextDocumentRegistra
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.documentFormattingProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentFormattingProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDocumentFormattingEdits: ProvideDocumentFormattingEditsSignature = (
-      document,
-      options,
-      token
-    ) => {
-      let params: DocumentFormattingParams = {
-        textDocument: {
-          uri: document.uri
-        },
-        options
-      }
-      return client
-        .sendRequest(DocumentFormattingRequest.type, params, token)
-        .then(res => res, error => {
-          client.logFailedRequest(DocumentFormattingRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDocumentFormatProvider(
-      options.documentSelector!,
-      {
-        provideDocumentFormattingEdits: (
-          document: TextDocument,
-          options: FormattingOptions,
-          token: CancellationToken
-        ): ProviderResult<TextEdit[]> => {
-          return middleware.provideDocumentFormattingEdits
-            ? middleware.provideDocumentFormattingEdits(
-              document,
-              options,
-              token,
-              provideDocumentFormattingEdits
-            )
-            : provideDocumentFormattingEdits(document, options, token)
+  ): [Disposable, DocumentFormattingEditProvider] {
+    const provider: DocumentFormattingEditProvider = {
+      provideDocumentFormattingEdits: (document, options, token) => {
+        const client = this._client
+        const provideDocumentFormattingEdits: ProvideDocumentFormattingEditsSignature = (document, options, token) => {
+          const params: DocumentFormattingParams = {
+            textDocument: { uri: document.uri },
+            options
+          }
+          return client.sendRequest(DocumentFormattingRequest.type, params, token).then(res => res, (error) => {
+            client.logFailedRequest(DocumentFormattingRequest.type, error)
+            return Promise.resolve([])
+          })
         }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDocumentFormattingEdits
+          ? middleware.provideDocumentFormattingEdits(document, options, token, provideDocumentFormattingEdits)
+          : provideDocumentFormattingEdits(document, options, token)
       }
-    )
+    }
+
+    return [languages.registerDocumentFormatProvider(options.documentSelector!, provider), provider]
   }
 }
 
-class DocumentRangeFormattingFeature extends TextDocumentFeature<TextDocumentRegistrationOptions> {
+class DocumentRangeFormattingFeature extends TextDocumentFeature<
+  boolean | DocumentRangeFormattingOptions, DocumentRangeFormattingRegistrationOptions, DocumentRangeFormattingEditProvider
+  > {
   constructor(client: BaseLanguageClient) {
     super(client, DocumentRangeFormattingRequest.type)
   }
@@ -2570,70 +2545,47 @@ class DocumentRangeFormattingFeature extends TextDocumentFeature<TextDocumentReg
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.documentRangeFormattingProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentRangeFormattingProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector })
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: TextDocumentRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDocumentRangeFormattingEdits: ProvideDocumentRangeFormattingEditsSignature = (
-      document,
-      range,
-      options,
-      token
-    ) => {
-      let params: DocumentRangeFormattingParams = {
-        textDocument: {
-          uri: document.uri
-        },
-        range,
-        options,
-      }
-      return client
-        .sendRequest(DocumentRangeFormattingRequest.type, params, token)
-        .then(res => res, error => {
-          client.logFailedRequest(DocumentRangeFormattingRequest.type, error)
-          return Promise.resolve([])
-        })
-    }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDocumentRangeFormatProvider(
-      options.documentSelector!,
-      {
-        provideDocumentRangeFormattingEdits: (
-          document: TextDocument,
-          range: Range,
-          options: FormattingOptions,
-          token: CancellationToken
-        ): ProviderResult<TextEdit[]> => {
-          return middleware.provideDocumentRangeFormattingEdits
-            ? middleware.provideDocumentRangeFormattingEdits(
-              document,
-              range,
-              options,
-              token,
-              provideDocumentRangeFormattingEdits
-            )
-            : provideDocumentRangeFormattingEdits(
-              document,
-              range,
-              options,
-              token
-            )
+  ): [Disposable, DocumentRangeFormattingEditProvider] {
+    const provider: DocumentRangeFormattingEditProvider = {
+      provideDocumentRangeFormattingEdits: (document, range, options, token) => {
+        const client = this._client
+        const provideDocumentRangeFormattingEdits: ProvideDocumentRangeFormattingEditsSignature = (document, range, options, token) => {
+          const params: DocumentRangeFormattingParams = {
+            textDocument: { uri: document.uri },
+            range,
+            options,
+          }
+          return client.sendRequest(DocumentRangeFormattingRequest.type, params, token).then(res => res, error => {
+            client.logFailedRequest(DocumentRangeFormattingRequest.type, error)
+            return Promise.resolve([])
+          })
         }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDocumentRangeFormattingEdits
+          ? middleware.provideDocumentRangeFormattingEdits(document, range, options, token, provideDocumentRangeFormattingEdits)
+          : provideDocumentRangeFormattingEdits(document, range, options, token)
       }
-    )
+    }
+
+    return [languages.registerDocumentRangeFormatProvider(options.documentSelector, provider), provider]
   }
 }
 
-class DocumentOnTypeFormattingFeature extends TextDocumentFeature<DocumentOnTypeFormattingRegistrationOptions> {
+class DocumentOnTypeFormattingFeature extends TextDocumentFeature<
+  DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingRegistrationOptions, OnTypeFormattingEditProvider
+  > {
 
   constructor(client: BaseLanguageClient) {
     super(client, DocumentOnTypeFormattingRequest.type)
@@ -2644,45 +2596,46 @@ class DocumentOnTypeFormattingFeature extends TextDocumentFeature<DocumentOnType
   }
 
   public initialize(capabilities: ServerCapabilities, documentSelector: DocumentSelector): void {
-    if (!capabilities.documentOnTypeFormattingProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentOnTypeFormattingProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector }, capabilities.documentOnTypeFormattingProvider)
+      registerOptions: options
     })
   }
 
-  protected registerLanguageProvider(options: DocumentOnTypeFormattingRegistrationOptions): Disposable {
-    let client = this._client
-    let moreTriggerCharacter = options.moreTriggerCharacter || []
-    let provideOnTypeFormattingEdits: ProvideOnTypeFormattingEditsSignature = (document, position, ch, options, token) => {
-      let params: DocumentOnTypeFormattingParams = {
-        textDocument: cv.asVersionedTextDocumentIdentifier(document),
-        position,
-        ch,
-        options
+  protected registerLanguageProvider(options: DocumentOnTypeFormattingRegistrationOptions): [Disposable, OnTypeFormattingEditProvider] {
+    const provider: OnTypeFormattingEditProvider = {
+      provideOnTypeFormattingEdits: (document, position, ch, options, token) => {
+        const client = this._client
+        const provideOnTypeFormattingEdits: ProvideOnTypeFormattingEditsSignature = (document, position, ch, options, token) => {
+          const params: DocumentOnTypeFormattingParams = {
+            textDocument: cv.asVersionedTextDocumentIdentifier(document),
+            position,
+            ch,
+            options
+          }
+          return client.sendRequest(DocumentOnTypeFormattingRequest.type, params, token).then(res => res, (error) => {
+            client.logFailedRequest(DocumentOnTypeFormattingRequest.type, error)
+            return Promise.resolve([])
+          })
+        }
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideOnTypeFormattingEdits
+          ? middleware.provideOnTypeFormattingEdits(document, position, ch, options, token, provideOnTypeFormattingEdits)
+          : provideOnTypeFormattingEdits(document, position, ch, options, token)
       }
-      return client.sendRequest(DocumentOnTypeFormattingRequest.type, params, token).then(res => res, error => {
-        client.logFailedRequest(DocumentOnTypeFormattingRequest.type, error)
-        return Promise.resolve([])
-      })
     }
 
-    let middleware = client.clientOptions.middleware!
-    let characters = [options.firstTriggerCharacter, ...moreTriggerCharacter]
-    return languages.registerOnTypeFormattingEditProvider(
-      options.documentSelector!, {
-        provideOnTypeFormattingEdits: (document: TextDocument, position: Position, ch: string, options: FormattingOptions, token: CancellationToken): ProviderResult<TextEdit[]> => {
-          return middleware.provideOnTypeFormattingEdits
-            ? middleware.provideOnTypeFormattingEdits(document, position, ch, options, token, provideOnTypeFormattingEdits)
-            : provideOnTypeFormattingEdits(document, position, ch, options, token)
-        }
-      }, characters)
+    const moreTriggerCharacter = options.moreTriggerCharacter || []
+    const characters = [options.firstTriggerCharacter, ...moreTriggerCharacter]
+    return [languages.registerOnTypeFormattingEditProvider(options.documentSelector!, provider, characters), provider]
   }
 }
 
-class RenameFeature extends TextDocumentFeature<TextDocumentRegistrationOptions> {
+class RenameFeature extends TextDocumentFeature<boolean | RenameOptions, RenameRegistrationOptions, RenameProvider> {
   constructor(client: BaseLanguageClient) {
     super(client, RenameRequest.type)
   }
@@ -2697,181 +2650,149 @@ class RenameFeature extends TextDocumentFeature<TextDocumentRegistrationOptions>
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.renameProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.renameProvider)
+    if (!options) {
       return
+    }
+    if (Is.boolean(capabilities.renameProvider)) {
+      options.prepareProvider = false
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign({}, { documentSelector: documentSelector }, capabilities.renameProvider || {})
+      registerOptions: options
     })
   }
 
-  protected registerLanguageProvider(options: RenameRegistrationOptions): Disposable {
-    let client = this._client
-    let provideRenameEdits: ProvideRenameEditsSignature = (
-      document,
-      position,
-      newName,
-      token
-    ) => {
-      let params: RenameParams = {
-        textDocument: {
-          uri: document.uri
-        },
-        position,
-        newName: newName
-      }
-      return client
-        .sendRequest(RenameRequest.type, params, token)
-        .then(res => res, (error: ResponseError<void>) => {
-          client.logFailedRequest(RenameRequest.type, error)
-          return Promise.reject(new Error(error.message))
+  protected registerLanguageProvider(options: RenameRegistrationOptions): [Disposable, RenameProvider] {
+    const provider: RenameProvider = {
+      provideRenameEdits: (document, position, newName, token) => {
+        const client = this._client
+        const provideRenameEdits: ProvideRenameEditsSignature = (document, position, newName, token) => {
+          const params: RenameParams = {
+            textDocument: { uri: document.uri },
+            position,
+            newName: newName
+          }
+          return client.sendRequest(RenameRequest.type, params, token).then(res => res, (error: ResponseError<void>) => {
+            client.logFailedRequest(RenameRequest.type, error)
+            return Promise.reject(new Error(error.message))
+          })
         }
-        )
-    }
-    let prepareRename: PrepareRenameSignature = (document, position, token) => {
-      let params: TextDocumentPositionParams = {
-        textDocument: cv.asTextDocumentIdentifier(document),
-        position
-      }
-      return client.sendRequest(PrepareRenameRequest.type, params, token).then(result => {
-        return result
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideRenameEdits
+          ? middleware.provideRenameEdits(document, position, newName, token, provideRenameEdits)
+          : provideRenameEdits(document, position, newName, token)
       },
-        (error: ResponseError<void>) => {
-          client.logFailedRequest(PrepareRenameRequest.type, error)
-          return Promise.reject(new Error(error.message))
+      prepareRename: options.prepareProvider
+        ? (document, position, token) => {
+          const client = this._client
+          const prepareRename: PrepareRenameSignature = (document, position, token) => {
+            const params: TextDocumentPositionParams = {
+              textDocument: cv.asTextDocumentIdentifier(document),
+              position
+            }
+            return client.sendRequest(PrepareRenameRequest.type, params, token).then(
+              (result) => {
+                if (Range.is(result)) {
+                  return result
+                } else if (result && Range.is(result.range)) {
+                  return {
+                    range: result.range,
+                    placeholder: result.placeholder
+                  }
+                }
+                // To cancel the rename vscode API expects a rejected promise.
+                return Promise.reject(new Error(`The element can't be renamed.`))
+              },
+              (error: ResponseError<void>) => {
+                client.logFailedRequest(PrepareRenameRequest.type, error)
+                return Promise.reject(new Error(error.message))
+              }
+            )
+          }
+          const middleware = client.clientOptions.middleware!
+          return middleware.prepareRename
+            ? middleware.prepareRename(document, position, token, prepareRename)
+            : prepareRename(document, position, token)
         }
-      )
+        : undefined
     }
 
-    let middleware = client.clientOptions.middleware!
-    return languages.registerRenameProvider(
-      options.documentSelector, {
-        provideRenameEdits: (
-          document: TextDocument,
-          position: Position,
-          newName: string,
-          token: CancellationToken
-        ): ProviderResult<WorkspaceEdit> => {
-          return middleware.provideRenameEdits
-            ? middleware.provideRenameEdits(
-              document,
-              position,
-              newName,
-              token,
-              provideRenameEdits
-            )
-            : provideRenameEdits(document, position, newName, token)
-        },
-        prepareRename: options.prepareProvider
-          ? (document: TextDocument, position: Position, token: CancellationToken): ProviderResult<Range | { range: Range, placeholder: string }> => {
-            return middleware.prepareRename
-              ? middleware.prepareRename(document, position, token, prepareRename)
-              : prepareRename(document, position, token)
-          } : undefined
-      })
+    return [languages.registerRenameProvider(options.documentSelector, provider), provider]
   }
 }
 
-class DocumentLinkFeature extends TextDocumentFeature<
-  DocumentLinkRegistrationOptions
-  > {
+class DocumentLinkFeature extends TextDocumentFeature<DocumentLinkOptions, DocumentLinkRegistrationOptions, DocumentLinkProvider> {
   constructor(client: BaseLanguageClient) {
     super(client, DocumentLinkRequest.type)
   }
 
   public fillClientCapabilities(capabilites: ClientCapabilities): void {
-    ensure(
-      ensure(capabilites, 'textDocument')!,
-      'documentLink'
-    )!.dynamicRegistration = true
+    const documentLinkCapabilities = ensure(ensure(capabilites, 'textDocument')!, 'documentLink')!
+    documentLinkCapabilities.dynamicRegistration = true
+    // TODO support tooltip
+    documentLinkCapabilities.tooltipSupport = true
   }
 
   public initialize(
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
-    if (!capabilities.documentLinkProvider || !documentSelector) {
+    const options = this.getRegistrationOptions(documentSelector, capabilities.documentLinkProvider)
+    if (!options) {
       return
     }
     this.register(this.messages, {
       id: UUID.generateUuid(),
-      registerOptions: Object.assign(
-        {},
-        { documentSelector: documentSelector },
-        capabilities.documentLinkProvider
-      )
+      registerOptions: options
     })
   }
 
   protected registerLanguageProvider(
     options: DocumentLinkRegistrationOptions
-  ): Disposable {
-    let client = this._client
-    let provideDocumentLinks: ProvideDocumentLinksSignature = (document, token) => {
-      return client.sendRequest(
-        DocumentLinkRequest.type,
-        {
-          textDocument: {
-            uri: document.uri
-          }
-        },
-        token
-      ).then(
-        res => res,
-        (error: ResponseError<void>) => {
-          client.logFailedRequest(DocumentLinkRequest.type, error)
-          Promise.resolve(new Error(error.message))
+  ): [Disposable, DocumentLinkProvider] {
+    const provider: DocumentLinkProvider = {
+      provideDocumentLinks: (document: TextDocument, token: CancellationToken): ProviderResult<DocumentLink[]> => {
+        const client = this._client
+        const provideDocumentLinks: ProvideDocumentLinksSignature = (document, token) => {
+          return client.sendRequest(
+            DocumentLinkRequest.type,
+            {
+              textDocument: { uri: document.uri }
+            },
+            token
+          ).then(res => res, (error: ResponseError<void>) => {
+            client.logFailedRequest(DocumentLinkRequest.type, error)
+            return Promise.resolve([])
+          })
         }
-      )
-    }
-    let resolveDocumentLink = (link, token) => {
-      return client
-        .sendRequest(
-          DocumentLinkResolveRequest.type,
-          link,
-          token
-        )
-        .then(
-          res => res,
-          (error: ResponseError<void>) => {
-            client.logFailedRequest(DocumentLinkResolveRequest.type, error)
-            Promise.resolve(new Error(error.message))
+        const middleware = client.clientOptions.middleware!
+        return middleware.provideDocumentLinks
+          ? middleware.provideDocumentLinks(document, token, provideDocumentLinks)
+          : provideDocumentLinks(document, token)
+      },
+      resolveDocumentLink: options.resolveProvider
+        ? (link, token) => {
+          const client = this._client
+          let resolveDocumentLink: ResolveDocumentLinkSignature = (link, token) => {
+            return client.sendRequest(DocumentLinkResolveRequest.type, link, token).then(res => res, (error: ResponseError<void>) => {
+              client.logFailedRequest(DocumentLinkResolveRequest.type, error)
+              return Promise.resolve(link)
+            })
           }
-        )
+          const middleware = client.clientOptions.middleware!
+          return middleware.resolveDocumentLink
+            ? middleware.resolveDocumentLink(link, token, resolveDocumentLink)
+            : resolveDocumentLink(link, token)
+        }
+        : undefined
     }
-    let middleware = client.clientOptions.middleware!
-    return languages.registerDocumentLinkProvider(
-      options.documentSelector!,
-      {
-        provideDocumentLinks: (
-          document: TextDocument,
-          token: CancellationToken
-        ): ProviderResult<DocumentLink[]> => {
-          return middleware.provideDocumentLinks
-            ? middleware.provideDocumentLinks(
-              document,
-              token,
-              provideDocumentLinks
-            )
-            : provideDocumentLinks(document, token)
-        },
-        resolveDocumentLink: options.resolveProvider
-          ? (
-            link: DocumentLink,
-            token: CancellationToken
-          ): ProviderResult<DocumentLink> => {
-            return middleware.resolveDocumentLink
-              ? middleware.resolveDocumentLink(link, token, resolveDocumentLink)
-              : resolveDocumentLink(link, token)
-          }
-          : undefined
-      })
+
+    return [languages.registerDocumentLinkProvider(options.documentSelector, provider), provider]
   }
 }
 
-class ConfigurationFeature
-  implements DynamicFeature<DidChangeConfigurationRegistrationOptions> {
+class ConfigurationFeature implements DynamicFeature<DidChangeConfigurationRegistrationOptions> {
   private _listeners: Map<string, Disposable> = new Map<string, Disposable>()
 
   constructor(private _client: BaseLanguageClient) { }
@@ -2886,7 +2807,7 @@ class ConfigurationFeature
 
   public initialize(): void {
     let section = this._client.clientOptions.synchronize!.configurationSection
-    if (section != null) {
+    if (section !== void 0) {
       this.register(this.messages, {
         id: UUID.generateUuid(),
         registerOptions: {
@@ -2901,9 +2822,9 @@ class ConfigurationFeature
     data: RegistrationData<DidChangeConfigurationRegistrationOptions>
   ): void {
     let { section } = data.registerOptions
-    let disposable = workspace.onDidChangeConfiguration(() => {
+    let disposable = workspace.onDidChangeConfiguration((event) => {
       if (section != null) {
-        this.onDidChangeConfiguration(data.registerOptions.section)
+        this.onDidChangeConfiguration(data.registerOptions.section, event)
       }
     })
     this._listeners.set(data.id, disposable)
@@ -2912,7 +2833,7 @@ class ConfigurationFeature
       if (!settings || Is.emptyObject(settings)) return
     }
     if (section != null) {
-      this.onDidChangeConfiguration(data.registerOptions.section)
+      this.onDidChangeConfiguration(data.registerOptions.section, undefined)
     }
   }
 
@@ -2931,12 +2852,18 @@ class ConfigurationFeature
     this._listeners.clear()
   }
 
-  private onDidChangeConfiguration(configurationSection: string | string[]): void {
+  private onDidChangeConfiguration(configurationSection: string | string[], event: ConfigurationChangeEvent | undefined): void {
     let sections: string[] | undefined
     if (Is.string(configurationSection)) {
       sections = [configurationSection]
     } else {
       sections = configurationSection
+    }
+    if (sections !== void 0 && event !== void 0) {
+      const affected = sections.some((section) => event.affectsConfiguration(section))
+      if (!affected) {
+        return
+      }
     }
     let isConfigured = sections.length == 1 && /^languageserver\..+\.settings$/.test(sections[0])
     let didChangeConfiguration = (sections: string[] | undefined): void => {
@@ -3033,23 +2960,25 @@ class ExecuteCommandFeature
     _message: RPCMessageType,
     data: RegistrationData<ExecuteCommandRegistrationOptions>
   ): void {
-    let client = this._client
+    const client = this._client
+    const middleware = client.clientOptions.middleware!
+    const executeCommand: ExecuteCommandSignature = (command: string, args: any[]): any => {
+      const params: ExecuteCommandParams = {
+        command,
+        arguments: args
+      }
+      return client.sendRequest(ExecuteCommandRequest.type, params).then(undefined, (error) => {
+        client.logFailedRequest(ExecuteCommandRequest.type, error)
+      })
+    }
     if (data.registerOptions.commands) {
       let disposables: Disposable[] = []
       for (const command of data.registerOptions.commands) {
-        disposables.push(
-          commands.registerCommand(command, (...args: any[]) => {
-            let params: ExecuteCommandParams = {
-              command,
-              arguments: args
-            }
-            return client
-              .sendRequest(ExecuteCommandRequest.type, params)
-              .then(undefined, error => {
-                client.logFailedRequest(ExecuteCommandRequest.type, error)
-              })
-          }, null, true)
-        )
+        disposables.push(commands.registerCommand(command, (...args: any[]) => {
+          return middleware.executeCommand
+            ? middleware.executeCommand(command, args, executeCommand)
+            : executeCommand(command, args)
+        }, null, true))
       }
       this._commands.set(data.id, disposables)
     }
@@ -3087,22 +3016,41 @@ export namespace MessageTransports {
   }
 }
 
+class OnReady {
+  private _used: boolean
+  constructor(private _resolve: () => void, private _reject: (error: any) => void) {
+    this._used = false
+  }
+
+  public get isUsed(): boolean {
+    return this._used
+  }
+
+  public resolve(): void {
+    this._used = true
+    this._resolve()
+  }
+
+  public reject(error: any): void {
+    this._used = true
+    this._reject(error)
+  }
+}
+
 export abstract class BaseLanguageClient {
   private _id: string
   private _name: string
-  private _clientOptions: Lazy<ResolvedClientOptions>
+  private _clientOptions: ResolvedClientOptions
 
   protected _state: ClientState
   private _onReady: Promise<void>
   private _onReadyCallbacks: OnReady
-  private _onStop: Thenable<void> | undefined
-  private _connectionPromise: Thenable<IConnection> | undefined
+  private _onStop: Promise<void> | undefined
+  private _connectionPromise: Promise<IConnection> | undefined
   private _resolvedConnection: IConnection | undefined
   private _initializeResult: InitializeResult | undefined
-  private _disposeOutputChannel: boolean
   private _outputChannel: OutputChannel | undefined
-  private _capabilities: ServerCapabilities &
-    ResolvedTextDocumentSyncCapabilities
+  private _capabilities: ServerCapabilities & ResolvedTextDocumentSyncCapabilities
 
   private _listeners: Disposable[] | undefined
   private _providers: Disposable[] | undefined
@@ -3120,45 +3068,35 @@ export abstract class BaseLanguageClient {
   public constructor(
     id: string,
     name: string,
-    clientOptionsFunc: () => LanguageClientOptions
+    clientOptions: LanguageClientOptions
   ) {
     this._id = id
     this._name = name
-    clientOptionsFunc = clientOptionsFunc || (() => { return {} })
-    this._clientOptions = new Lazy(() => {
-      let clientOptions = clientOptionsFunc()
-      if (clientOptions.outputChannel) {
-        this._outputChannel = clientOptions.outputChannel
-        this._disposeOutputChannel = false
-      } else {
-        this._outputChannel = undefined
-        this._disposeOutputChannel = true
-      }
-
-      let eval_options = {
-        disableWorkspaceFolders: clientOptions.disableWorkspaceFolders,
-        disableDynamicRegister: clientOptions.disableDynamicRegister,
-        disableDiagnostics: clientOptions.disableDiagnostics,
-        disableCompletion: clientOptions.disableCompletion,
-        ignoredRootPaths: clientOptions.ignoredRootPaths,
-        documentSelector: clientOptions.documentSelector || [],
-        synchronize: clientOptions.synchronize || {},
-        diagnosticCollectionName: clientOptions.diagnosticCollectionName,
-        outputChannelName: clientOptions.outputChannelName || this._id,
-        revealOutputChannelOn:
-          clientOptions.revealOutputChannelOn || RevealOutputChannelOn.Never,
-        stdioEncoding: clientOptions.stdioEncoding || 'utf8',
-        initializationOptions: clientOptions.initializationOptions,
-        initializationFailedHandler: clientOptions.initializationFailedHandler,
-        errorHandler:
-          clientOptions.errorHandler || new DefaultErrorHandler(this._id),
-        middleware: clientOptions.middleware || {},
-        workspaceFolder: clientOptions.workspaceFolder
-      }
-      eval_options.synchronize = eval_options.synchronize || {}
-      return eval_options
-    })
-
+    if (clientOptions.outputChannel) {
+      this._outputChannel = clientOptions.outputChannel
+    } else {
+      this._outputChannel = undefined
+    }
+    this._clientOptions = {
+      disableWorkspaceFolders: clientOptions.disableWorkspaceFolders,
+      disableDynamicRegister: clientOptions.disableDynamicRegister,
+      disableDiagnostics: clientOptions.disableDiagnostics,
+      disableCompletion: clientOptions.disableCompletion,
+      ignoredRootPaths: clientOptions.ignoredRootPaths,
+      documentSelector: clientOptions.documentSelector || [],
+      synchronize: clientOptions.synchronize || {},
+      diagnosticCollectionName: clientOptions.diagnosticCollectionName,
+      outputChannelName: clientOptions.outputChannelName || this._id,
+      revealOutputChannelOn:
+        clientOptions.revealOutputChannelOn || RevealOutputChannelOn.Never,
+      stdioEncoding: clientOptions.stdioEncoding || 'utf8',
+      initializationOptions: clientOptions.initializationOptions,
+      initializationFailedHandler: clientOptions.initializationFailedHandler,
+      progressOnInitialization: !!clientOptions.progressOnInitialization,
+      errorHandler: clientOptions.errorHandler || new DefaultErrorHandler(this._id),
+      middleware: clientOptions.middleware || {},
+      workspaceFolder: clientOptions.workspaceFolder
+    }
     this.state = ClientState.Initial
     this._connectionPromise = undefined
     this._resolvedConnection = undefined
@@ -3225,22 +3163,22 @@ export abstract class BaseLanguageClient {
   public sendRequest<R, E, RO>(
     type: RequestType0<R, E, RO>,
     token?: CancellationToken
-  ): Thenable<R>
+  ): Promise<R>
   public sendRequest<P, R, E, RO>(
     type: RequestType<P, R, E, RO>,
     params: P,
     token?: CancellationToken
-  ): Thenable<R>
-  public sendRequest<R>(method: string, token?: CancellationToken): Thenable<R>
+  ): Promise<R>
+  public sendRequest<R>(method: string, token?: CancellationToken): Promise<R>
   public sendRequest<R>(
     method: string,
     param: any,
     token?: CancellationToken
-  ): Thenable<R>
+  ): Promise<R>
   public sendRequest<R>(
     type: string | RPCMessageType,
     ...params: any[]
-  ): Thenable<R> {
+  ): Promise<R> {
     if (!this.isConnectionActive()) {
       throw new Error('Language client is not ready yet')
     }
@@ -3289,10 +3227,7 @@ export abstract class BaseLanguageClient {
   }
 
   public sendNotification<RO>(type: NotificationType0<RO>): void
-  public sendNotification<P, RO>(
-    type: NotificationType<P, RO>,
-    params?: P
-  ): void
+  public sendNotification<P, RO>(type: NotificationType<P, RO>, params?: P): void
   public sendNotification(method: string): void
   public sendNotification(method: string, params: any): void
   public sendNotification<P>(type: string | RPCMessageType, params?: P): void {
@@ -3312,18 +3247,9 @@ export abstract class BaseLanguageClient {
   }
 
   public onNotification<RO>(type: NotificationType0<RO>, handler: NotificationHandler0): void
-  public onNotification<P, RO>(
-    type: NotificationType<P, RO>,
-    handler: NotificationHandler<P>
-  ): void
-  public onNotification(
-    method: string,
-    handler: GenericNotificationHandler
-  ): void
-  public onNotification(
-    type: string | RPCMessageType,
-    handler: GenericNotificationHandler
-  ): void {
+  public onNotification<P, RO>(type: NotificationType<P, RO>, handler: NotificationHandler<P>): void
+  public onNotification(method: string, handler: GenericNotificationHandler): void
+  public onNotification(type: string | RPCMessageType, handler: GenericNotificationHandler): void {
     if (!this.isConnectionActive()) {
       throw new Error('Language client is not ready yet')
     }
@@ -3340,8 +3266,33 @@ export abstract class BaseLanguageClient {
     }
   }
 
+  public onProgress<P>(type: ProgressType<P>, token: string | number, handler: NotificationHandler<P>): Disposable {
+    if (!this.isConnectionActive()) {
+      throw new Error('Language client is not ready yet')
+    }
+    try {
+      return this._resolvedConnection!.onProgress(type, token, handler)
+    } catch (error) {
+      this.error(`Registering progress handler for token ${token} failed.`, error)
+      throw error
+    }
+  }
+
+  public sendProgress<P>(type: ProgressType<P>, token: string | number, value: P): void {
+    if (!this.isConnectionActive()) {
+      throw new Error('Language client is not ready yet')
+    }
+    this.forceDocumentSync()
+    try {
+      this._resolvedConnection!.sendProgress(type, token, value)
+    } catch (error) {
+      this.error(`Sending progress for token ${token} failed.`, error)
+      throw error
+    }
+  }
+
   public get clientOptions(): LanguageClientOptions {
-    return this._clientOptions.value()
+    return this._clientOptions
   }
 
   public get onDidChangeState(): Event<StateChangeEvent> {
@@ -3350,7 +3301,7 @@ export abstract class BaseLanguageClient {
 
   public get outputChannel(): OutputChannel {
     if (!this._outputChannel) {
-      let { outputChannelName } = this._clientOptions.value()
+      let { outputChannelName } = this._clientOptions
       this._outputChannel = workspace.createOutputChannel(outputChannelName ? outputChannelName : this._name)
     }
     return this._outputChannel
@@ -3425,7 +3376,7 @@ export abstract class BaseLanguageClient {
       dataString = this.data2String(data)
       this.outputChannel.appendLine(dataString)
     }
-    if (this._clientOptions.value().revealOutputChannelOn <= level) {
+    if (this._clientOptions.revealOutputChannelOn <= level) {
       this.outputChannel.show(true)
     }
   }
@@ -3485,8 +3436,9 @@ export abstract class BaseLanguageClient {
     this._providers = []
     // If we restart then the diagnostics collection is reused.
     if (!this._diagnostics) {
-      this._diagnostics = this._clientOptions.value().diagnosticCollectionName
-        ? languages.createDiagnosticCollection(this._clientOptions.value().diagnosticCollectionName)
+      let { diagnosticCollectionName } = this._clientOptions
+      this._diagnostics = this._clientOptions
+        ? languages.createDiagnosticCollection(diagnosticCollectionName)
         : languages.createDiagnosticCollection(this._id)
     }
 
@@ -3553,7 +3505,7 @@ export abstract class BaseLanguageClient {
     })
   }
 
-  private resolveConnection(): Thenable<IConnection> {
+  private resolveConnection(): Promise<IConnection> {
     if (!this._connectionPromise) {
       this._connectionPromise = this.createConnection()
     }
@@ -3561,10 +3513,10 @@ export abstract class BaseLanguageClient {
   }
 
   private resolveRootPath(): string | null {
-    if (this._clientOptions.value().workspaceFolder) {
-      return URI.parse(this._clientOptions.value().workspaceFolder.uri).fsPath
+    if (this._clientOptions.workspaceFolder) {
+      return URI.parse(this._clientOptions.workspaceFolder.uri).fsPath
     }
-    let { ignoredRootPaths } = this._clientOptions.value()
+    let { ignoredRootPaths } = this._clientOptions
     let config = workspace.getConfiguration(this.id)
     let rootPatterns = config.get<string[]>('rootPatterns', [])
     let required = config.get<boolean>('requireRootPattern', false)
@@ -3585,115 +3537,130 @@ export abstract class BaseLanguageClient {
     return rootPath
   }
 
-  private initialize(connection: IConnection): Thenable<InitializeResult> {
+  private initialize(connection: IConnection): Promise<InitializeResult> {
     this.refreshTrace(connection, false)
-    this._clientOptions.invalidate()
-    let initOption = this._clientOptions.value().initializationOptions
+    let { initializationOptions, progressOnInitialization } = this._clientOptions
     let rootPath = this.resolveRootPath()
-    logger.debug(`initialize: initializationOptions = ${JSON.stringify(initOption)}`)
     if (!rootPath) return
     let initParams: any = {
       processId: process.pid,
       rootPath: rootPath ? rootPath : null,
       rootUri: rootPath ? cv.asUri(URI.file(rootPath)) : null,
       capabilities: this.computeClientCapabilities(),
-      initializationOptions: Is.func(initOption) ? initOption() : initOption,
+      initializationOptions: Is.func(initializationOptions) ? initializationOptions() : initializationOptions,
       trace: Trace.toString(this._trace),
+      workspaceFolders: null,
     }
     this.fillInitializeParams(initParams)
-    return connection
-      .initialize(initParams)
-      .then(result => {
-        this._resolvedConnection = connection
-        this._initializeResult = result
-        this.state = ClientState.Running
+    if (progressOnInitialization) {
+      const token: ProgressToken = UUID.generateUuid()
+      // same as VSCode
+      initParams.workDoneToken = token
+      const part = progressManager.create(connection, token)
+      part.begin({ kind: 'begin', title: `Starting LS ${this.id}` })
+      return this.doInitialize(connection, initParams).then((result) => {
+        part.done('finished')
+        return result
+      }, (error) => {
+        part.cancel()
+        throw error
+      })
+    } else {
+      return this.doInitialize(connection, initParams)
+    }
+  }
 
-        let textDocumentSyncOptions:
-          | TextDocumentSyncOptions
-          | undefined = undefined
-        if (Is.number(result.capabilities.textDocumentSync)) {
-          if (result.capabilities.textDocumentSync === TextDocumentSyncKind.None) {
-            textDocumentSyncOptions = {
-              openClose: false,
-              change: TextDocumentSyncKind.None,
-              save: undefined
-            }
-          } else {
-            textDocumentSyncOptions = {
-              openClose: true,
-              change: result.capabilities.textDocumentSync,
-              save: {
-                includeText: false
-              }
+  private doInitialize(connection: IConnection, initParams: InitializeParams): Promise<InitializeResult> {
+    return connection.initialize(initParams).then(result => {
+      this._resolvedConnection = connection
+      this._initializeResult = result
+      this.state = ClientState.Running
+
+      let textDocumentSyncOptions: TextDocumentSyncOptions | undefined = undefined
+      if (Is.number(result.capabilities.textDocumentSync)) {
+        if (result.capabilities.textDocumentSync === TextDocumentSyncKind.None) {
+          textDocumentSyncOptions = {
+            openClose: false,
+            change: TextDocumentSyncKind.None,
+            save: undefined
+          }
+        } else {
+          textDocumentSyncOptions = {
+            openClose: true,
+            change: result.capabilities.textDocumentSync,
+            save: {
+              includeText: false
             }
           }
-        } else if (result.capabilities.textDocumentSync != null) {
-          textDocumentSyncOptions = result.capabilities.textDocumentSync as TextDocumentSyncOptions
         }
-        this._capabilities = Object.assign({}, result.capabilities, {
-          resolvedTextDocumentSync: textDocumentSyncOptions
-        })
-        if (!this._clientOptions.value().disableDiagnostics) {
-          connection.onDiagnostics(params => this.handleDiagnostics(params))
+      } else if (result.capabilities.textDocumentSync != null) {
+        textDocumentSyncOptions = result.capabilities.textDocumentSync as TextDocumentSyncOptions
+      }
+      this._capabilities = Object.assign({}, result.capabilities, {
+        resolvedTextDocumentSync: textDocumentSyncOptions
+      })
+      if (!this._clientOptions.disableDiagnostics) {
+        connection.onDiagnostics(params => this.handleDiagnostics(params))
+      }
+      connection.onRequest(RegistrationRequest.type, params =>
+        this.handleRegistrationRequest(params)
+      )
+      // See https://github.com/Microsoft/vscode-languageserver-node/issues/199
+      connection.onRequest('client/registerFeature', params =>
+        this.handleRegistrationRequest(params)
+      )
+      connection.onRequest(UnregistrationRequest.type, params =>
+        this.handleUnregistrationRequest(params)
+      )
+      // See https://github.com/Microsoft/vscode-languageserver-node/issues/199
+      connection.onRequest('client/unregisterFeature', params =>
+        this.handleUnregistrationRequest(params)
+      )
+      connection.onRequest(ApplyWorkspaceEditRequest.type, params =>
+        this.handleApplyWorkspaceEdit(params)
+      )
+
+      connection.sendNotification(InitializedNotification.type, {})
+
+      this.hookFileEvents(connection)
+      this.hookConfigurationChanged(connection)
+      this.initializeFeatures(connection)
+      this._onReadyCallbacks.resolve()
+      return result
+    }).then<InitializeResult>(undefined, error => {
+      if (this._clientOptions.initializationFailedHandler) {
+        if (this._clientOptions.initializationFailedHandler(error)) {
+          this.initialize(connection)
+        } else {
+          this.stop()
+          this._onReadyCallbacks.reject(error)
         }
-        connection.onRequest(RegistrationRequest.type, params =>
-          this.handleRegistrationRequest(params)
-        )
-        // See https://github.com/Microsoft/vscode-languageserver-node/issues/199
-        connection.onRequest('client/registerFeature', params =>
-          this.handleRegistrationRequest(params)
-        )
-        connection.onRequest(UnregistrationRequest.type, params =>
-          this.handleUnregistrationRequest(params)
-        )
-        // See https://github.com/Microsoft/vscode-languageserver-node/issues/199
-        connection.onRequest('client/unregisterFeature', params =>
-          this.handleUnregistrationRequest(params)
-        )
-        connection.onRequest(ApplyWorkspaceEditRequest.type, params =>
-          this.handleApplyWorkspaceEdit(params)
-        )
-
-        connection.sendNotification(InitializedNotification.type, {})
-
-        this.hookFileEvents(connection)
-        this.hookConfigurationChanged(connection)
-        this.initializeFeatures(connection)
-        this._onReadyCallbacks.resolve()
-        return result
-      }).then<InitializeResult>(undefined, error => {
-        if (this._clientOptions.value().initializationFailedHandler) {
-          if (this._clientOptions.value().initializationFailedHandler(error)) {
+      } else if (
+        error instanceof ResponseError &&
+        error.data &&
+        error.data.retry
+      ) {
+        workspace.showPrompt(error.message + ' Retry?').then(confirmed => {
+          if (confirmed) {
             this.initialize(connection)
           } else {
             this.stop()
             this._onReadyCallbacks.reject(error)
           }
-        } else if (
-          error instanceof ResponseError &&
-          error.data &&
-          error.data.retry
-        ) {
-          workspace.showPrompt(error.message + ' Retry?').then(confirmed => {
-            if (confirmed) {
-              this.initialize(connection)
-            } else {
-              this.stop()
-              this._onReadyCallbacks.reject(error)
-            }
-          })
-        } else {
-          if (error && error.message) {
-            workspace.showMessage(error.message, 'error')
-          }
-          this.error('Server initialization failed.', error)
-          this.stop()
-          this._onReadyCallbacks.reject(error)
+        })
+      } else {
+        if (error && error.message) {
+          workspace.showMessage(error.message, 'error')
         }
-      })
+        this.error('Server initialization failed.', error)
+        this.stop()
+        this._onReadyCallbacks.reject(error)
+      }
+      throw error
+    })
   }
 
-  public stop(): Thenable<void> {
+  public stop(): Promise<void> {
     this._initializeResult = undefined
     if (!this._connectionPromise) {
       this.state = ClientState.Stopped
@@ -3710,6 +3677,7 @@ export abstract class BaseLanguageClient {
         connection.exit()
         connection.dispose()
         this.state = ClientState.Stopped
+        this.cleanUpChannel()
         this._onStop = undefined
         this._connectionPromise = undefined
         this._resolvedConnection = undefined
@@ -3732,33 +3700,46 @@ export abstract class BaseLanguageClient {
     for (let handler of this._dynamicFeatures.values()) {
       handler.dispose()
     }
-    if (channel && this._outputChannel && this._disposeOutputChannel) {
+    if (channel) {
+      this.cleanUpChannel()
+    }
+    if (this._diagnostics) {
+      if (diagnostics) {
+        this._diagnostics.dispose()
+        this._diagnostics = undefined
+      } else {
+        this._diagnostics.clear()
+      }
+    }
+  }
+
+  private cleanUpChannel(): void {
+    if (this._outputChannel) {
       this._outputChannel.dispose()
       this._outputChannel = undefined
-    }
-    if (diagnostics && this._diagnostics) {
-      this._diagnostics.dispose()
-      this._diagnostics = undefined
     }
   }
 
   private notifyFileEvent(event: FileEvent): void {
-    this._fileEvents.push(event)
-    this._fileEventDelayer.trigger(() => {
-      this.onReady().then(
-        () => {
-          this.resolveConnection().then(connection => {
-            if (this.isConnectionActive()) {
-              connection.didChangeWatchedFiles({ changes: this._fileEvents })
+    const client = this
+    function didChangeWatchedFile(this: void, event: FileEvent) {
+      client._fileEvents.push(event)
+      client._fileEventDelayer.trigger(() => {
+        client.onReady().then(() => {
+          client.resolveConnection().then(connection => {
+            if (client.isConnectionActive()) {
+              client.forceDocumentSync()
+              connection.didChangeWatchedFiles({ changes: client._fileEvents })
             }
-            this._fileEvents = []
+            client._fileEvents = []
           })
-        },
-        error => {
-          this.error(`Notify file events failed.`, error)
-        }
-      )
-    })
+        }, (error) => {
+          client.error(`Notify file events failed.`, error)
+        })
+      })
+    }
+    const workSpaceMiddleware = this.clientOptions.middleware?.workspace
+    workSpaceMiddleware?.didChangeWatchedFile ? workSpaceMiddleware.didChangeWatchedFile(event, didChangeWatchedFile) : didChangeWatchedFile(event)
   }
 
   private forceDocumentSync(): void {
@@ -3785,14 +3766,38 @@ export abstract class BaseLanguageClient {
     if (!this._diagnostics) {
       return
     }
-    this._diagnostics.set(uri, diagnostics)
+
+    const separate = workspace.getConfiguration('diagnostic').get('separateRelatedInformationAsDiagnostics') as boolean
+    if (separate && diagnostics.length > 0) {
+      const entries: Map<string, Diagnostic[]> = new Map()
+      entries.set(uri, diagnostics)
+
+      for (const diagnostic of diagnostics) {
+        if (diagnostic.relatedInformation?.length) {
+          let message = `${diagnostic.message}\n\nRelated diagnostics:\n`
+          for (const info of diagnostic.relatedInformation) {
+            const basename = path.basename(URI.parse(info.location.uri).fsPath)
+            const ln = info.location.range.start.line
+            message = `${message}\n${basename}(line ${ln + 1}): ${info.message}`
+
+            const diags: Diagnostic[] = entries.get(info.location.uri) || []
+            diags.push(Diagnostic.create(info.location.range, info.message, DiagnosticSeverity.Hint, diagnostic.code, diagnostic.source))
+            entries.set(info.location.uri, diags)
+          }
+          diagnostic.message = message
+        }
+        this._diagnostics.set(Array.from(entries))
+      }
+    } else {
+      this._diagnostics.set(uri, diagnostics)
+    }
   }
 
   protected abstract createMessageTransports(
     encoding: string
-  ): Thenable<MessageTransports | null>
+  ): Promise<MessageTransports | null>
 
-  private createConnection(): Thenable<IConnection> {
+  private createConnection(): Promise<IConnection> {
     let errorHandler = (error: Error, message: Message, count: number) => {
       logger.error('connection error:', error, message)
       this.handleConnectionError(error, message, count)
@@ -3803,7 +3808,7 @@ export abstract class BaseLanguageClient {
     }
 
     return this.createMessageTransports(
-      this._clientOptions.value().stdioEncoding || 'utf8'
+      this._clientOptions.stdioEncoding || 'utf8'
     ).then(transports => {
       return createConnection(
         transports.reader,
@@ -3831,7 +3836,7 @@ export abstract class BaseLanguageClient {
     }
     let action = CloseAction.DoNotRestart
     try {
-      action = this._clientOptions.value().errorHandler!.closed()
+      action = this._clientOptions.errorHandler!.closed()
     } catch (error) {
       // Ignore errors coming from the error handler.
     }
@@ -3845,7 +3850,7 @@ export abstract class BaseLanguageClient {
       this.cleanUp(false, true)
     } else if (action === CloseAction.Restart) {
       this.info('Connection to server got closed. Server will restart.')
-      this.cleanUp(false, false)
+      this.cleanUp(false, true)
       this.state = ClientState.Initial
       this.start()
     }
@@ -3857,7 +3862,7 @@ export abstract class BaseLanguageClient {
   }
 
   private handleConnectionError(error: Error, message: Message, count: number) {
-    let action = this._clientOptions.value().errorHandler!.error(error, message, count)
+    let action = this._clientOptions.errorHandler!.error(error, message, count)
     if (action === ErrorAction.Shutdown) {
       this.error('Connection to server is erroring. Shutting down server.')
       this.stop()
@@ -3896,7 +3901,7 @@ export abstract class BaseLanguageClient {
   }
 
   private hookFileEvents(_connection: IConnection): void {
-    let fileEvents = this._clientOptions.value().synchronize.fileEvents
+    let fileEvents = this._clientOptions.synchronize.fileEvents
     if (!fileEvents) return
     let watchers: FileWatcher[]
     if (Array.isArray(fileEvents)) {
@@ -3946,6 +3951,36 @@ export abstract class BaseLanguageClient {
     }
   }
 
+  public getFeature(request: typeof DidOpenTextDocumentNotification.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => void>
+  public getFeature(request: typeof DidChangeTextDocumentNotification.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => void>
+  public getFeature(request: typeof WillSaveTextDocumentNotification.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => void>
+  public getFeature(request: typeof WillSaveTextDocumentWaitUntilRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => ProviderResult<TextEdit[]>>
+  public getFeature(request: typeof DidSaveTextDocumentNotification.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => void>
+  public getFeature(request: typeof DidCloseTextDocumentNotification.method): DynamicFeature<TextDocumentRegistrationOptions> & NotificationFeature<(textDocument: TextDocument) => void>
+  public getFeature(request: typeof CompletionRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<CompletionItemProvider>
+  public getFeature(request: typeof HoverRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<HoverProvider>
+  public getFeature(request: typeof SignatureHelpRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<SignatureHelpProvider>
+  public getFeature(request: typeof DefinitionRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DefinitionProvider>
+  public getFeature(request: typeof ReferencesRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<ReferenceProvider>
+  public getFeature(request: typeof DocumentHighlightRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DocumentHighlightProvider>
+  public getFeature(request: typeof CodeActionRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<CodeActionProvider>
+  public getFeature(request: typeof DocumentFormattingRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DocumentFormattingEditProvider>
+  public getFeature(request: typeof DocumentRangeFormattingRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DocumentRangeFormattingEditProvider>
+  public getFeature(request: typeof DocumentOnTypeFormattingRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<OnTypeFormattingEditProvider>
+  public getFeature(request: typeof RenameRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<RenameProvider>
+  public getFeature(request: typeof DocumentLinkRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DocumentLinkProvider>
+  public getFeature(request: typeof DocumentColorRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DocumentColorProvider>
+  public getFeature(request: typeof DeclarationRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<DeclarationProvider>
+  public getFeature(request: typeof FoldingRangeRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<FoldingRangeProvider>
+  public getFeature(request: typeof ImplementationRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<ImplementationProvider>
+  public getFeature(request: typeof SelectionRangeRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<SelectionRangeProvider>
+  public getFeature(request: typeof TypeDefinitionRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<TypeDefinitionProvider>
+  public getFeature(request: typeof Proposed.CallHierarchyPrepareRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & TextDocumentProviderFeature<TypeDefinitionProvider>
+  public getFeature(request: typeof WorkspaceSymbolRequest.method): DynamicFeature<TextDocumentRegistrationOptions> & WorkspaceProviderFeature<WorkspaceSymbolProvider>
+  public getFeature(request: string): DynamicFeature<any> | undefined {
+    return this._dynamicFeatures.get(request)
+  }
+
   protected registerBuiltinFeatures() {
     this.registerFeature(new ConfigurationFeature(this))
     this.registerFeature(new DidOpenTextDocumentFeature(this, this._syncedDocuments))
@@ -3955,7 +3990,7 @@ export abstract class BaseLanguageClient {
     this.registerFeature(new DidSaveTextDocumentFeature(this))
     this.registerFeature(new DidCloseTextDocumentFeature(this, this._syncedDocuments))
     this.registerFeature(new FileSystemWatcherFeature(this, event => this.notifyFileEvent(event)))
-    if (!this._clientOptions.value().disableCompletion) {
+    if (!this._clientOptions.disableCompletion) {
       this.registerFeature(new CompletionItemFeature(this))
     }
     this.registerFeature(new HoverFeature(this))
@@ -3990,7 +4025,10 @@ export abstract class BaseLanguageClient {
     workspaceEdit.documentChanges = true
     workspaceEdit.resourceOperations = [ResourceOperationKind.Create, ResourceOperationKind.Rename, ResourceOperationKind.Delete]
     workspaceEdit.failureHandling = FailureHandlingKind.TextOnlyTransactional
-    ensure(ensure(result, 'textDocument')!, 'publishDiagnostics')!.relatedInformation = true
+    const diagnostics = ensure(ensure(result, 'textDocument')!, 'publishDiagnostics')!
+    diagnostics.relatedInformation = true
+    diagnostics.versionSupport = false
+    // diagnostics.tagSupport = { valueSet: [DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated] }
     for (let feature of this._features) {
       feature.fillClientCapabilities(result)
     }
@@ -3998,7 +4036,7 @@ export abstract class BaseLanguageClient {
   }
 
   private initializeFeatures(_connection: IConnection): void {
-    let documentSelector = this._clientOptions.value().documentSelector
+    let documentSelector = this._clientOptions.documentSelector
     for (let feature of this._features) {
       feature.initialize(this._capabilities, documentSelector)
     }
@@ -4006,7 +4044,7 @@ export abstract class BaseLanguageClient {
 
   private handleRegistrationRequest(
     params: RegistrationParams
-  ): Thenable<void> {
+  ): Promise<void> {
     if (this.clientOptions.disableDynamicRegister) return Promise.resolve()
     return new Promise<void>((resolve, reject) => {
       for (let registration of params.registrations) {
@@ -4020,8 +4058,7 @@ export abstract class BaseLanguageClient {
           return
         }
         const options = registration.registerOptions || {}
-        options.documentSelector =
-          options.documentSelector || this._clientOptions.value().documentSelector
+        options.documentSelector = options.documentSelector || this._clientOptions.documentSelector
         const data: RegistrationData<any> = {
           id: registration.id,
           registerOptions: options
@@ -4034,7 +4071,7 @@ export abstract class BaseLanguageClient {
 
   private handleUnregistrationRequest(
     params: UnregistrationParams
-  ): Thenable<void> {
+  ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       for (let unregistration of params.unregisterations) {
         const feature = this._dynamicFeatures.get(unregistration.method)
@@ -4054,11 +4091,30 @@ export abstract class BaseLanguageClient {
 
   private handleApplyWorkspaceEdit(
     params: ApplyWorkspaceEditParams
-  ): Thenable<ApplyWorkspaceEditResponse> {
+  ): Promise<ApplyWorkspaceEditResponse> {
+    // This is some sort of workaround since the version check should be done by VS Code in the Workspace.applyEdit.
+    // However doing it here adds some safety since the server can lag more behind then an extension.
+    let workspaceEdit: WorkspaceEdit = params.edit
+    let openTextDocuments: Map<string, TextDocument> = new Map<string, TextDocument>()
+    workspace.textDocuments.forEach((document) => openTextDocuments.set(document.uri.toString(), document))
+    let versionMismatch = false
+    if (workspaceEdit.documentChanges) {
+      for (const change of workspaceEdit.documentChanges) {
+        if (TextDocumentEdit.is(change) && change.textDocument.version && change.textDocument.version >= 0) {
+          let textDocument = openTextDocuments.get(change.textDocument.uri)
+          if (textDocument && textDocument.version !== change.textDocument.version) {
+            versionMismatch = true
+            break
+          }
+        }
+      }
+    }
+    if (versionMismatch) {
+      return Promise.resolve({ applied: false })
+    }
     return workspace.applyEdit(params.edit).then(value => {
       return { applied: value }
-    }
-    )
+    })
   }
 
   public logFailedRequest(type: RPCMessageType, error: any): void {
@@ -4072,5 +4128,3 @@ export abstract class BaseLanguageClient {
     this.error(`Request ${type.method} failed.`, error)
   }
 }
-
-

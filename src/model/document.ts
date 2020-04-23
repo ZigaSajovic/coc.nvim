@@ -1,6 +1,7 @@
 import { Buffer, Neovim } from '@chemzqm/neovim'
 import debounce from 'debounce'
-import { Emitter, Event, Position, Range, TextDocument, TextEdit, CancellationToken } from 'vscode-languageserver-protocol'
+import { Emitter, Event, Position, Range, TextEdit, CancellationToken } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { URI } from 'vscode-uri'
 import { DidChangeTextDocumentParams, BufferOption, ChangeInfo, Env } from '../types'
 import events from '../events'
@@ -26,6 +27,7 @@ export default class Document {
   public fetchContent: Function & { clear(): void }
   // start id for matchaddpos
   private colorId = 1080
+  private size: number
   private nvim: Neovim
   private eol = true
   private attached = false
@@ -42,7 +44,8 @@ export default class Document {
   public readonly onDocumentDetach: Event<string> = this._onDocumentDetach.event
   constructor(
     public readonly buffer: Buffer,
-    private env: Env) {
+    private env: Env,
+    private maxFileSize: number | null) {
     this.fireContentChanges = debounce(() => {
       this.nvim.mode.then(m => {
         if (m.blocking) {
@@ -63,9 +66,10 @@ export default class Document {
    * Currently only attach for empty and `acwrite` buftype.
    */
   public get shouldAttach(): boolean {
-    let { buftype } = this
+    let { buftype, maxFileSize } = this
     if (!this.getVar('enabled', true)) return false
     if (this.uri.endsWith('%5BCommand%20Line%5D')) return true
+    if (maxFileSize && this.size && maxFileSize < this.size) return false
     return buftype == '' || buftype == 'acwrite'
   }
 
@@ -125,17 +129,20 @@ export default class Document {
     let opts: BufferOption = await nvim.call('coc#util#get_bufoptions', buffer.id)
     if (opts == null) return false
     let buftype = this.buftype = opts.buftype
+    this.size = opts.size
     this.variables = opts.variables
     this._changedtick = opts.changedtick
     this.eol = opts.eol == 1
     let uri = this._uri = getUri(opts.fullpath, buffer.id, buftype, this.env.isCygwin)
     if (token.isCancellationRequested) return false
     try {
-      if (!this.env.isVim) {
-        let res = await this.attach()
-        if (!res) return false
-      } else {
-        this.lines = await buffer.lines
+      if (this.shouldAttach) {
+        if (this.env.isVim) {
+          this.lines = await buffer.lines
+        } else {
+          let res = await this.attach()
+          if (!res) return false
+        }
       }
       this.attached = true
     } catch (e) {
@@ -154,14 +161,9 @@ export default class Document {
   }
 
   private async attach(): Promise<boolean> {
-    if (this.shouldAttach) {
-      let attached = await this.buffer.attach(false)
-      if (!attached) return false
-      this.lines = await this.buffer.lines
-    } else {
-      this.lines = await this.buffer.lines
-      return true
-    }
+    let attached = await this.buffer.attach(false)
+    if (!attached) return false
+    this.lines = await this.buffer.lines
     if (!this.buffer.isAttached) return
     this.buffer.listen('lines', (...args: any[]) => {
       this.onChange.apply(this, args)
@@ -224,7 +226,7 @@ export default class Document {
     try {
       let content = this.getDocumentContent()
       let endOffset = null
-      if (cursor && cursor.bufnr == this.bufnr) {
+      if (!force && cursor && cursor.bufnr == this.bufnr) {
         endOffset = this.getEndOffset(cursor.lnum, cursor.col, cursor.insert)
         if (!cursor.insert && content.length < this.content.length) {
           endOffset = endOffset + 1
@@ -248,7 +250,8 @@ export default class Document {
         textDocument: { version, uri },
         contentChanges: changes
       })
-      this._words = this.chars.matchKeywords(this.lines.join('\n'))
+      let lines = this.lines.length > 30000 ? this.lines.slice(0, 30000) : this.lines
+      this._words = this.chars.matchKeywords(lines.join('\n'))
     } catch (e) {
       logger.error(e.message)
     }

@@ -53,6 +53,9 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
   if (filetype == 'typescriptreact') {
     filetype = 'typescript'
   }
+  let maxBytes = lines.reduce((p, c) => {
+    return Math.max(p, byteLength(c))
+  }, 0)
   const id = createHash('md5').update(content).digest('hex')
   if (cache[id]) return Promise.resolve(cache[id])
   if (workspace.env.isVim) return Promise.resolve([])
@@ -174,6 +177,7 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
       nvim.on('notification', callback)
       await nvim.callAtomic([
         ['nvim_set_option', ['runtimepath', env.runtimepath]],
+        ['nvim_command', [`highlight! link Normal CocFloating`]],
         ['nvim_command', [`runtime syntax/${filetype}.vim`]],
         ['nvim_command', [`colorscheme ${env.colorscheme || 'default'}`]],
         ['nvim_command', [`set background=${env.background}`]],
@@ -187,7 +191,7 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
       let buf = await nvim.buffer
       await buf.setLines(lines, { start: 0, end: -1, strictIndexing: false })
       await buf.setOption('filetype', filetype)
-      await nvim.uiAttach(200, lines.length + 1, {
+      await nvim.uiAttach(maxBytes + 10, lines.length + 1, {
         ext_hlstate: true,
         ext_linegrid: true
       })

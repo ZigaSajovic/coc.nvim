@@ -1,8 +1,8 @@
 import { debounce } from 'debounce'
 import fastDiff from 'fast-diff'
-import os from 'os'
 import fs from 'fs'
 import isuri from 'isuri'
+import mkdirp from 'mkdirp'
 import path from 'path'
 import rimraf from 'rimraf'
 import semver from 'semver'
@@ -16,8 +16,7 @@ import DB from './model/db'
 import ExtensionManager from './model/extension'
 import Memos from './model/memos'
 import { Extension, ExtensionContext, ExtensionInfo, ExtensionState } from './types'
-import { disposeAll, concurrent, wait } from './util'
-import mkdirp from 'mkdirp'
+import { concurrent, disposeAll, wait } from './util'
 import { distinct } from './util/array'
 import './util/extensions'
 import { createExtension, ExtensionExport } from './util/factory'
@@ -149,20 +148,28 @@ export class Extensions {
     stats = stats.filter(o => !this.disabled.has(o.id) && !lockedList.includes(o.id))
     let names = stats.map(o => o.id)
     let statusItem = workspace.createStatusBarItem(0, { progress: true })
-    statusItem.text = `Updating extensions.`
+    statusItem.text = `Updating extensions...`
     statusItem.show()
     this.db.push('lastUpdate', Date.now())
+    const updates: string[] = []
     await concurrent(names.map(name => {
       let o = stats.find(o => o.id == name)
       return (): Promise<void> => {
         return this.manager.update(this.npm, name, o.exotic ? o.uri : undefined).then(updated => {
-          if (updated) this.reloadExtension(name).logError()
+          if (updated) {
+            updates.push(name)
+            this.reloadExtension(name).logError()
+          }
         }, err => {
-          workspace.showMessage(`Error on update ${name}: ${err}`)
+          workspace.showMessage(`Error on update ${name}: ${err}`, 'error')
         })
       }
     }), 5)
-    workspace.showMessage('Update completed', 'more')
+    if (updates.length) {
+      workspace.showMessage(`Update extensions: ${updates.join(' ')}`, 'more')
+    } else {
+      workspace.showMessage(`Update completed`)
+    }
     statusItem.dispose()
   }
 
@@ -217,13 +224,15 @@ export class Extensions {
     let statusItem = workspace.createStatusBarItem(0, { progress: true })
     statusItem.show()
     statusItem.text = `Installing ${list.join(' ')}`
-    await Promise.all(list.map(def => {
-      return this.manager.install(npm, def).then(name => {
-        if (name) this.onExtensionInstall(name).logError()
-      }, err => {
-        workspace.showMessage(`Error on install ${def}: ${err}`)
-      })
-    }))
+    await concurrent(list.map(def => {
+      return (): Promise<void> => {
+        return this.manager.install(npm, def).then(name => {
+          if (name) this.onExtensionInstall(name).logError()
+        }, err => {
+          workspace.showMessage(`Error on install ${def}: ${err}`, 'error')
+        })
+      }
+    }), 3)
     statusItem.dispose()
   }
 
@@ -247,11 +256,9 @@ export class Extensions {
     return ids
   }
 
-  private get npm(): string {
+  public get npm(): string {
     let npm = workspace.getConfiguration('npm').get<string>('binPath', 'npm')
-    if (npm.startsWith('~')) {
-      npm = os.homedir() + npm.slice(1)
-    }
+    npm = workspace.expand(npm)
     for (let exe of [npm, 'yarnpkg', 'yarn', 'npm']) {
       try {
         let res = which.sync(exe)
@@ -396,7 +403,7 @@ export class Extensions {
       status.dispose()
       const sortedObj = { dependencies: {} }
       Object.keys(json.dependencies).sort().forEach(k => {
-          sortedObj.dependencies[k] = json.dependencies[k]
+        sortedObj.dependencies[k] = json.dependencies[k]
       })
       fs.writeFileSync(jsonFile, JSON.stringify(sortedObj, null, 2), { encoding: 'utf8' })
       workspace.showMessage(`Removed: ${ids.join(' ')}`)
@@ -741,13 +748,17 @@ export class Extensions {
     }
   }
 
-  private createExtension(root: string, packageJSON: any, isLocal = false): string {
+  private createExtension(root: string, packageJSON: any, isLocal = false): void {
     let id = `${packageJSON.name}`
     let isActive = false
     let exports = null
     let filename = path.join(root, packageJSON.main || 'index.js')
     let ext: ExtensionExport
     let subscriptions: Disposable[] = []
+    if (packageJSON.main && !fs.existsSync(filename)) {
+      workspace.showMessage(`extension "${id}" doesn't contain main file ${filename}.`, 'error')
+      return
+    }
     let extension: any = {
       activate: async (): Promise<API> => {
         if (isActive) return
@@ -843,7 +854,6 @@ export class Extensions {
     if (this.activated) {
       this.setupActiveEvents(id, packageJSON)
     }
-    return id
   }
 
   private async initializeRoot(): Promise<void> {

@@ -2,8 +2,8 @@ import { SpawnOptions } from 'child_process'
 import { EventEmitter } from 'events'
 import fs from 'fs'
 import net from 'net'
-import os from 'os'
-import { Disposable, DocumentSelector, Emitter, TextDocument } from 'vscode-languageserver-protocol'
+import { Disposable, DocumentSelector, Emitter } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { Executable, ForkOptions, LanguageClient, LanguageClientOptions, RevealOutputChannelOn, ServerOptions, State, Transport, TransportKind } from './language-client'
 import { IServiceProvider, LanguageServerConfig, ServiceStat } from './types'
 import { disposeAll, wait } from './util'
@@ -88,10 +88,6 @@ export class ServiceManager extends EventEmitter implements Disposable {
     return service
   }
 
-  private hasService(id: string): boolean {
-    return this.registered.has(id)
-  }
-
   private shouldStart(service: IServiceProvider): boolean {
     if (service.state != ServiceStat.Initial) {
       return false
@@ -172,21 +168,10 @@ export class ServiceManager extends EventEmitter implements Disposable {
   }
 
   private createCustomServices(): void {
-    let base = 'languageserver'
-    let lspConfig = workspace.getConfiguration().get<{ string: LanguageServerConfig }>(base, {} as any)
+    let lspConfig = workspace.getConfiguration().get<{ string: LanguageServerConfig }>('languageserver', {} as any)
     for (let key of Object.keys(lspConfig)) {
-      if (this.registered.get(key)) continue
       let config: LanguageServerConfig = lspConfig[key]
-      let id = `${base}.${key}`
-      if (config.enable === false || this.hasService(id)) continue
-      let lazy_opts = () => {
-        // re-read configuration
-        let lspConfig_ = workspace.getConfiguration().get<{ string: LanguageServerConfig }>(base, {} as any)
-        return getLanguageServerOptions(id, key, lspConfig_[key])
-      }
-      if (!lazy_opts()) continue
-      let client = new LanguageClient(id, key, { deferredOptions: lazy_opts })
-      this.registLanguageClient(client)
+      this.registLanguageClient(key, config)
     }
   }
 
@@ -222,10 +207,22 @@ export class ServiceManager extends EventEmitter implements Disposable {
     })
   }
 
-  public async sendRequest(id: string, method: string, params?: any): Promise<any> {
-    if (!method) {
-      throw new Error(`method required for sendRequest`)
+  public async sendNotification(id: string, method: string, params?: any): Promise<void> {
+    if (!method) throw new Error(`method required for ontification`)
+    let service = this.getService(id)
+    // wait for extension activate
+    if (!service || !service.client) throw new Error(`Language server ${id} not found`)
+    if (service.state == ServiceStat.Starting) {
+      await service.client.onReady()
     }
+    if (service.state != ServiceStat.Running) {
+      throw new Error(`Language server ${id} not running`)
+    }
+    await Promise.resolve(service.client.sendNotification(method, params))
+  }
+
+  public async sendRequest(id: string, method: string, params?: any): Promise<any> {
+    if (!method) throw new Error(`method required for sendRequest`)
     let service = this.getService(id)
     // wait for extension activate
     if (!service) await wait(100)
@@ -242,26 +239,60 @@ export class ServiceManager extends EventEmitter implements Disposable {
     return await Promise.resolve(service.client.sendRequest(method, params))
   }
 
-  public registLanguageClient(client: LanguageClient): Disposable {
+  public registLanguageClient(client: LanguageClient): Disposable
+  public registLanguageClient(name: string, config: LanguageServerConfig): Disposable
+  public registLanguageClient(name: string | LanguageClient, config?: LanguageServerConfig): Disposable {
+    let id = typeof name === 'string' ? `languageserver.${name}` : name.id
     let disposables: Disposable[] = []
     let onDidServiceReady = new Emitter<void>()
-
+    let client: LanguageClient | null = typeof name === 'string' ? null : name
+    if (this.registered.has(id)) return
+    let created = false
     let service: IServiceProvider = {
+      id,
       client,
-      id: client.id,
-      name: client.name,
-      selector: client.clientOptions.documentSelector,
+      name: typeof name === 'string' ? name : name.name,
+      selector: typeof name === 'string' ? getDocumentSelector(config.filetypes, config.additionalSchemes) : name.clientOptions.documentSelector,
       state: ServiceStat.Initial,
       onServiceReady: onDidServiceReady.event,
       start: (): Promise<void> => {
-        if (service.state != ServiceStat.Initial && service.state != ServiceStat.Stopped) {
+        if (service.state == ServiceStat.Starting || service.state == ServiceStat.Running) {
+          return
+        }
+        if (client && !client.needsStart()) {
+          return
+        }
+        if (created && client) {
+          client.restart()
           return Promise.resolve()
         }
-        if (client.getPublicState() == State.Starting) {
-          return Promise.resolve()
+        if (!created) {
+          if (typeof name == 'string' && !client) {
+            let config: LanguageServerConfig = workspace.getConfiguration().get<{ string: LanguageServerConfig }>('languageserver', {} as any)[name]
+            if (!config || config.enable === false) return
+            let opts = getLanguageServerOptions(id, name, config)
+            if (!opts) return
+            client = new LanguageClient(id, name, opts[1], opts[0])
+            service.selector = opts[0].documentSelector
+            service.client = client
+          }
+          client.onDidChangeState(changeEvent => {
+            let { oldState, newState } = changeEvent
+            if (newState == State.Starting) {
+              service.state = ServiceStat.Starting
+            } else if (newState == State.Running) {
+              service.state = ServiceStat.Running
+            } else if (newState == State.Stopped) {
+              service.state = ServiceStat.Stopped
+            }
+            let oldStr = stateString(oldState)
+            let newStr = stateString(newState)
+            logger.info(`${client.name} state change: ${oldStr} => ${newStr}`)
+          }, null, disposables)
+          created = true
         }
         service.state = ServiceStat.Starting
-        logger.debug(`starting service: ${client.name}`)
+        logger.debug(`starting service: ${id}`)
         let disposable = client.start()
         disposables.push(disposable)
         return new Promise(resolve => {
@@ -269,42 +300,29 @@ export class ServiceManager extends EventEmitter implements Disposable {
             onDidServiceReady.fire(void 0)
             resolve()
           }, e => {
-            workspace.showMessage(`Server ${client.name} failed to start: ${e ? e.message : ''}`, 'error')
+            workspace.showMessage(`Server ${id} failed to start: ${e ? e.message : ''}`, 'error')
             service.state = ServiceStat.StartFailed
             resolve()
           })
         })
       },
-      dispose: () => {
-        client.stop()
+      dispose: async () => {
         onDidServiceReady.dispose()
         disposeAll(disposables)
       },
       stop: async (): Promise<void> => {
-        return await Promise.resolve(client.stop())
+        if (!client || !client.needsStop()) return
+        await Promise.resolve(client.stop())
       },
       restart: async (): Promise<void> => {
-        if (service.state == ServiceStat.Running) {
-          await service.stop()
+        if (client) {
+          service.state = ServiceStat.Starting
+          client.restart()
+        } else {
+          await service.start()
         }
-        service.state = ServiceStat.Starting
-        client.restart()
       },
     }
-    client.onDidChangeState(changeEvent => {
-      let { oldState, newState } = changeEvent
-      if (newState == State.Starting) {
-        service.state = ServiceStat.Starting
-      } else if (newState == State.Running) {
-        service.state = ServiceStat.Running
-      } else if (newState == State.Stopped) {
-        service.state = ServiceStat.Stopped
-      }
-      let oldStr = stateString(oldState)
-      let newStr = stateString(newState)
-      logger.info(`${client.name} state change: ${oldStr} => ${newStr}`)
-    }, null, disposables)
-
     return this.regist(service)
   }
 }
@@ -332,16 +350,15 @@ export function getLanguageServerOptions(id: string, name: string, config: Langu
     workspace.showMessage(`Wrong configuration of LS "${name}", no command or module specified.`, 'error')
     return null
   }
-  if (module && !fs.existsSync(module as string)) {
-    workspace.showMessage(`Module file "${module}" not found for LS "${name}"`, 'error')
-    return null
-  }
-  if (filetypes.length == 0) return
-  let isModule = module != null
   let serverOptions: ServerOptions
-  if (isModule) {
+  if (module) {
+    module = workspace.expand(module)
+    if (!fs.existsSync(module as string)) {
+      workspace.showMessage(`Module file "${module}" not found for LS "${name}"`, 'error')
+      return null
+    }
     serverOptions = {
-      module: module.toString(),
+      module,
       runtime: config.runtime || process.execPath,
       args,
       transport: getTransportKind(config),
@@ -357,7 +374,9 @@ export function getLanguageServerOptions(id: string, name: string, config: Langu
     serverOptions = () => {
       return new Promise((resolve, reject) => {
         let client = new net.Socket()
-        client.connect(port, config.host || '127.0.0.1', () => {
+        let host = config.host || '127.0.0.1'
+        logger.info(`languageserver "${id}" connecting to ${host}:${port}`)
+        client.connect(port, host, () => {
           resolve({
             reader: client,
             writer: client
@@ -369,26 +388,15 @@ export function getLanguageServerOptions(id: string, name: string, config: Langu
       })
     }
   }
-  let documentSelector: DocumentSelector = []
-  config.filetypes.forEach(filetype => {
-    let schemes = ['file', 'untitled'].concat(config.additionalSchemes || [])
-    documentSelector.push(...schemes.map(scheme => {
-      return { language: filetype, scheme }
-    }))
-  })
-  if (documentSelector.length == 0) {
-    documentSelector = [{ scheme: 'file' }, { scheme: 'untitled' }]
-  }
   let disableWorkspaceFolders = !!config.disableWorkspaceFolders
   let ignoredRootPaths = config.ignoredRootPaths || []
-  ignoredRootPaths = ignoredRootPaths.map(s => s.replace(/^~/, os.homedir()))
   let clientOptions: LanguageClientOptions = {
-    ignoredRootPaths,
+    ignoredRootPaths: ignoredRootPaths.map(s => workspace.expand(s)),
     disableWorkspaceFolders,
     disableDynamicRegister: !!config.disableDynamicRegister,
     disableCompletion: !!config.disableCompletion,
     disableDiagnostics: !!config.disableDiagnostics,
-    documentSelector,
+    documentSelector: getDocumentSelector(config.filetypes, config.additionalSchemes),
     revealOutputChannelOn: getRevealOutputChannelOn(config.revealOutputChannelOn),
     synchronize: {
       configurationSection: `${id}.settings`
@@ -396,6 +404,7 @@ export function getLanguageServerOptions(id: string, name: string, config: Langu
     diagnosticCollectionName: name,
     outputChannelName: id,
     stdioEncoding: config.stdioEncoding || 'utf8',
+    progressOnInitialization: config.progressOnInitialization !== false,
     initializationOptions: config.initializationOptions || {}
   }
   return [clientOptions, serverOptions]
@@ -414,6 +423,17 @@ export function getRevealOutputChannelOn(revealOn: string | undefined): RevealOu
     default:
       return RevealOutputChannelOn.Never
   }
+}
+
+export function getDocumentSelector(filetypes: string[], additionalSchemes?: string[]): DocumentSelector {
+  let documentSelector: DocumentSelector = []
+  filetypes.forEach(filetype => {
+    let schemes = ['file', 'untitled'].concat(additionalSchemes || [])
+    documentSelector.push(...schemes.map(scheme => {
+      return { language: filetype, scheme }
+    }))
+  })
+  return documentSelector
 }
 
 export function getTransportKind(config: LanguageServerConfig): Transport {
@@ -449,8 +469,9 @@ function stateString(state: State): string {
       return 'starting'
     case State.Stopped:
       return 'stopped'
+    default:
+      return 'unknown'
   }
-  return 'unknown'
 }
 
 export default new ServiceManager()

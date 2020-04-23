@@ -4,25 +4,25 @@
  *--------------------------------------------------------------------------------------------*/
 import cp, { SpawnOptions } from 'child_process'
 import fs from 'fs'
-import os from 'os'
 import path from 'path'
 import { createClientPipeTransport, createClientSocketTransport, Disposable, generateRandomPipeName, IPCMessageReader, IPCMessageWriter, StreamMessageReader, StreamMessageWriter } from 'vscode-languageserver-protocol'
+import which from 'which'
 import { ServiceStat } from '../types'
 import { disposeAll } from '../util'
 import * as Is from '../util/is'
 import { terminate } from '../util/processes'
 import workspace from '../workspace'
-import which from 'which'
 import { BaseLanguageClient, ClientState, DynamicFeature, LanguageClientOptions, MessageTransports, StaticFeature } from './client'
 import { ColorProviderFeature } from './colorProvider'
 import { ConfigurationFeature as PullConfigurationFeature } from './configuration'
 import { DeclarationFeature } from './declaration'
 import { FoldingRangeFeature } from './foldingRange'
 import { ImplementationFeature } from './implementation'
+import { ProgressFeature } from './progress'
 import { TypeDefinitionFeature } from './typeDefinition'
 import { WorkspaceFoldersFeature } from './workspaceFolders'
+import { SelectionRangeFeature } from './selectionRange'
 import ChildProcess = cp.ChildProcess
-import { resolveVariables } from '../util/string'
 
 const logger = require('../util/logger')('language-client-index')
 
@@ -30,10 +30,17 @@ export * from './client'
 
 declare var v8debug: any
 
+export interface ExecutableOptions {
+  cwd?: string
+  env?: any
+  detached?: boolean
+  shell?: boolean
+}
+
 export interface Executable {
   command: string
   args?: string[]
-  options?: SpawnOptions
+  options?: ExecutableOptions
 }
 
 namespace Executable {
@@ -136,17 +143,13 @@ export type ServerOptions =
   | { run: Executable; debug: Executable }
   | { run: NodeModule; debug: NodeModule }
   | NodeModule
-  | (() => Thenable<ChildProcess | StreamInfo | MessageTransports | ChildProcessInfo>)
-
-export interface DeferredLanguageClientServerOptions {
-  deferredOptions: () => [LanguageClientOptions, ServerOptions]
-}
+  | (() => Promise<ChildProcess | StreamInfo | MessageTransports | ChildProcessInfo>)
 
 export class LanguageClient extends BaseLanguageClient {
   private _forceDebug: boolean
   private _serverProcess: ChildProcess | undefined
   private _isDetached: boolean | undefined
-  private _options: () => [LanguageClientOptions, ServerOptions]
+  private _serverOptions: ServerOptions
 
   public constructor(
     name: string,
@@ -159,54 +162,44 @@ export class LanguageClient extends BaseLanguageClient {
     name: string,
     serverOptions: ServerOptions,
     clientOptions: LanguageClientOptions,
-    forceDebug?: boolean
-  )
-  public constructor(
-    id: string,
-    name: string,
-    options: DeferredLanguageClientServerOptions,
     forceDebug?: boolean
   )
   public constructor(
     arg1: string,
     arg2: string | ServerOptions,
-    arg3: DeferredLanguageClientServerOptions | boolean | ServerOptions | LanguageClientOptions,
+    arg3: LanguageClientOptions | ServerOptions,
     arg4?: boolean | LanguageClientOptions,
     arg5?: boolean
   ) {
     let id: string
     let name: string
-    let options: () => [LanguageClientOptions, ServerOptions]
+    let serverOptions: ServerOptions
+    let clientOptions: LanguageClientOptions
     let forceDebug: boolean
     if (Is.string(arg2)) {
       id = arg1
       name = arg2
-      if ((arg3 as DeferredLanguageClientServerOptions).deferredOptions) {
-        // 3rd signature
-        options = (arg3 as DeferredLanguageClientServerOptions).deferredOptions
-        forceDebug = !!arg4
-      }else {
-        // 2nd signature
-        options = () => [arg4 as LanguageClientOptions, arg3 as ServerOptions]
-        forceDebug = !!arg5
-      }
+      serverOptions = arg3 as ServerOptions
+      clientOptions = arg4 as LanguageClientOptions
+      forceDebug = !!arg5
     } else {
       // first signature
       id = arg1.toLowerCase()
       name = arg1
-      options = () => [arg3 as LanguageClientOptions, arg2 as ServerOptions]
+      serverOptions = arg2 as ServerOptions
+      clientOptions = arg3 as LanguageClientOptions
       forceDebug = arg4 as boolean
     }
     if (forceDebug === void 0) {
       forceDebug = false
     }
-    super(id, name, () => options()[0])
-    this._options = options
+    super(id, name, clientOptions)
+    this._serverOptions = serverOptions
     this._forceDebug = forceDebug
     this.registerProposedFeatures()
   }
 
-  public stop(): Thenable<void> {
+  public stop(): Promise<void> {
     return super.stop().then(() => {
       if (this._serverProcess) {
         let toCheck = this._serverProcess
@@ -297,8 +290,7 @@ export class LanguageClient extends BaseLanguageClient {
       return false
     }
 
-    let server = this._options()[1]
-    logger.debug(`createMessageTransports: server id = ${this.id}, option = ${JSON.stringify(server)}`)
+    let server = this._serverOptions
     // We got a function.
     if (Is.func(server)) {
       let result = await Promise.resolve(server())
@@ -426,15 +418,10 @@ export class LanguageClient extends BaseLanguageClient {
       let command: Executable = json as Executable
       let args = command.args || []
       let options = Object.assign({}, command.options)
-      options.env = options.env ? Object.assign(options.env, process.env) : process.env
+      options.env = options.env ? Object.assign({}, options.env, process.env) : process.env
       options.cwd = options.cwd || serverWorkingDir
       let cmd = json.command
-      if (cmd.startsWith('~')) {
-        cmd = os.homedir() + cmd.slice(1)
-      }
-      if (cmd.indexOf('$') !== -1) {
-        cmd = resolveVariables(cmd, { workspaceFolder: workspace.rootPath })
-      }
+      cmd = workspace.expand(cmd)
       if (path.isAbsolute(cmd) && !fs.existsSync(cmd)) {
         logger.info(`${cmd} of ${this.id} not exists`)
         return
@@ -476,6 +463,8 @@ export class LanguageClient extends BaseLanguageClient {
     this.registerFeature(new DeclarationFeature(this))
     this.registerFeature(new ColorProviderFeature(this))
     this.registerFeature(new FoldingRangeFeature(this))
+    this.registerFeature(new SelectionRangeFeature(this))
+    this.registerFeature(new ProgressFeature(this))
     if (!this.clientOptions.disableWorkspaceFolders) {
       this.registerFeature(new WorkspaceFoldersFeature(this))
     }
@@ -527,7 +516,7 @@ export class SettingMonitor {
       dispose: () => {
         disposeAll(this._listeners)
         if (this._client.needsStop()) {
-          this._client.stop()
+          void this._client.stop()
         }
       }
     }
@@ -543,7 +532,7 @@ export class SettingMonitor {
     if (enabled && this._client.needsStart()) {
       this._client.start()
     } else if (!enabled && this._client.needsStop()) {
-      this._client.stop()
+      void this._client.stop()
     }
   }
 }
@@ -551,7 +540,11 @@ export class SettingMonitor {
 // Exporting proposed protocol.
 export namespace ProposedFeatures {
   export function createAll(_client: BaseLanguageClient): (StaticFeature | DynamicFeature<any>)[] {
-    let result: (StaticFeature | DynamicFeature<any>)[] = []
+    let result: (StaticFeature | DynamicFeature<any>)[] = [
+      // TODO
+      // new CallHierarchyFeature(client),
+      // new SemanticTokensFeature(client)
+    ]
     return result
   }
 }

@@ -1,5 +1,6 @@
 import { Neovim } from '@chemzqm/neovim'
-import { Diagnostic, DiagnosticSeverity, Disposable, Location, Position, Range, TextDocument } from 'vscode-languageserver-protocol'
+import { Diagnostic, DiagnosticSeverity, Disposable, Location, Position, Range } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { URI } from 'vscode-uri'
 import events from '../events'
 import Document from '../model/document'
@@ -11,10 +12,12 @@ import workspace from '../workspace'
 import { DiagnosticBuffer } from './buffer'
 import DiagnosticCollection from './collection'
 import { getSeverityName, getSeverityType, severityLevel } from './util'
+import semver from 'semver'
 const logger = require('../util/logger')('diagnostic-manager')
 
 export interface DiagnosticConfig {
   enableSign: boolean
+  enableHighlightLineNumber: boolean
   checkCurrentLine: boolean
   enableMessage: string
   virtualText: boolean
@@ -39,6 +42,7 @@ export interface DiagnosticConfig {
   virtualTextLines: number
   virtualTextLineSeparator: string
   filetypeMap: object
+  format?: string
 }
 
 export class DiagnosticManager implements Disposable {
@@ -137,12 +141,20 @@ export class DiagnosticManager implements Disposable {
     workspace.configurations.onError(async () => {
       this.setConfigurationErrors()
     }, null, this.disposables)
-    let { errorSign, warningSign, infoSign, hintSign } = this.config
+    let { enableHighlightLineNumber } = this.config
+    if (!workspace.isNvim || semver.lt(workspace.env.version, 'v0.3.2')) {
+      enableHighlightLineNumber = false
+    }
     nvim.pauseNotification()
-    nvim.command(`sign define CocError   text=${errorSign}   linehl=CocErrorLine texthl=CocErrorSign`, true)
-    nvim.command(`sign define CocWarning text=${warningSign} linehl=CocWarningLine texthl=CocWarningSign`, true)
-    nvim.command(`sign define CocInfo    text=${infoSign}    linehl=CocInfoLine  texthl=CocInfoSign`, true)
-    nvim.command(`sign define CocHint    text=${hintSign}    linehl=CocHintLine  texthl=CocHintSign`, true)
+    if (this.config.enableSign) {
+      for (let kind of ['Error', 'Warning', 'Info', 'Hint']) {
+        let signText = this.config[kind.toLowerCase() + 'Sign']
+        let cmd = `sign define Coc${kind} linehl=Coc${kind}Line`
+        if (signText) cmd += ` texthl=Coc${kind}Sign text=${signText}`
+        if (enableHighlightLineNumber) cmd += ` numhl=Coc${kind}Sign`
+        nvim.command(cmd, true)
+      }
+    }
     if (this.config.virtualText && workspace.isNvim) {
       nvim.call('coc#util#init_virtual_hl', [], true)
     }
@@ -190,8 +202,14 @@ export class DiagnosticManager implements Disposable {
   public create(name: string): DiagnosticCollection {
     let collection = new DiagnosticCollection(name)
     this.collections.push(collection)
+    // Used for refresh diagnostics on buferEnter when refreshAfterSave is true
+    // Note we can't make sure it work as expected when there're multiple sources
+    let createTime = Date.now()
+    let refreshed = false
     collection.onDidDiagnosticsChange(async uri => {
-      if (this.config.refreshAfterSave) return
+      if (this.config.refreshAfterSave &&
+        (refreshed || Date.now() - createTime > 5000)) return
+      refreshed = true
       this.refreshBuffer(uri)
     })
     collection.onDidDiagnosticsClear(uris => {
@@ -296,7 +314,7 @@ export class DiagnosticManager implements Disposable {
   }
 
   /**
-   * Jump to previouse diagnostic position
+   * Jump to previous diagnostic position
    */
   public async jumpPrevious(severity?: string): Promise<void> {
     let buffer = await this.nvim.buffer
@@ -316,7 +334,9 @@ export class DiagnosticManager implements Disposable {
         return
       }
     }
-    await workspace.moveTo(ranges[ranges.length - 1].start)
+    if (await this.nvim.getOption('wrapscan')) {
+      await workspace.moveTo(ranges[ranges.length - 1].start)
+    }
   }
 
   /**
@@ -338,7 +358,9 @@ export class DiagnosticManager implements Disposable {
         return
       }
     }
-    await workspace.moveTo(ranges[0].start)
+    if (await this.nvim.getOption('wrapscan')) {
+      await workspace.moveTo(ranges[0].start)
+    }
   }
 
   /**
@@ -385,10 +407,10 @@ export class DiagnosticManager implements Disposable {
     let buffer = this.buffers.find(o => o.bufnr == bufnr)
     if (!buffer) return []
     let { checkCurrentLine } = this.config
-    let diagnostics = buffer.diagnostics.filter(o => {
-      if (checkCurrentLine) return lineInRange(pos.line, o.range)
-      return positionInRange(pos, o.range) == 0
-    })
+    let diagnostics = buffer.diagnostics.filter(o => positionInRange(pos, o.range) == 0)
+    if (diagnostics.length == 0 && checkCurrentLine) {
+      diagnostics = buffer.diagnostics.filter(o => lineInRange(pos.line, o.range))
+    }
     diagnostics.sort((a, b) => a.severity - b.severity)
     return diagnostics
   }
@@ -434,10 +456,11 @@ export class DiagnosticManager implements Disposable {
     diagnostics.forEach(diagnostic => {
       let { source, code, severity, message } = diagnostic
       let s = getSeverityName(severity)[0]
-      let str = `[${source}${code ? ' ' + code : ''}] [${s}] ${message}`
+      const codeStr = code ? ' ' + code : ''
+      const str = config.format.replace('%source', source).replace('%code', codeStr).replace('%severity', s).replace('%message', message)
       let filetype = 'Error'
       if (ft === '') {
-        switch (diagnostic.severity) {
+        switch (severity) {
           case DiagnosticSeverity.Hint:
             filetype = 'Hint'
             break
@@ -529,6 +552,7 @@ export class DiagnosticManager implements Disposable {
       virtualTextSrcId: workspace.createNameSpace('diagnostic-virtualText'),
       checkCurrentLine: getConfig<boolean>('checkCurrentLine', false),
       enableSign: getConfig<boolean>('enableSign', true),
+      enableHighlightLineNumber: getConfig<boolean>('enableHighlightLineNumber', true),
       maxWindowHeight: getConfig<number>('maxWindowHeight', 10),
       maxWindowWidth: getConfig<number>('maxWindowWidth', 80),
       enableMessage: getConfig<string>('enableMessage', 'always'),
@@ -549,6 +573,7 @@ export class DiagnosticManager implements Disposable {
       refreshAfterSave: getConfig<boolean>('refreshAfterSave', false),
       refreshOnInsertMode: getConfig<boolean>('refreshOnInsertMode', false),
       filetypeMap: getConfig<object>('filetypeMap', {}),
+      format: getConfig<string>('format', '[%source%code] [%severity] %message')
     }
     this.enabled = getConfig<boolean>('enable', true)
     if (this.config.displayByAle) {

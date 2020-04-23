@@ -1,4 +1,4 @@
-import { Diagnostic, Emitter, Event } from 'vscode-languageserver-protocol'
+import { Diagnostic, Emitter, Event, Position } from 'vscode-languageserver-protocol'
 import { DiagnosticCollection } from '../types'
 import { URI } from 'vscode-uri'
 import { emptyRange } from '../util/position'
@@ -22,30 +22,36 @@ export default class Collection implements DiagnosticCollection {
   public set(uri: string, diagnostics: Diagnostic[] | null): void
   public set(entries: [string, Diagnostic[] | null][]): void
   public set(entries: [string, Diagnostic[] | null][] | string, diagnostics?: Diagnostic[]): void {
-    if (Array.isArray(entries)) {
-      let map: Map<string, Diagnostic[]> = new Map()
-      for (let item of entries) {
-        let [file, diagnostics] = item
-        let exists = map.get(file) || []
-        if (diagnostics != null) {
-          for (let diagnostic of diagnostics) {
-            exists.push(diagnostic)
-          }
-        } else {
-          exists = []
-        }
-        map.set(file, exists)
-      }
-      for (let key of map.keys()) {
-        this.set(key, map.get(key))
-      }
-      return
+    if (!Array.isArray(entries)) {
+      let uri = entries
+      // if called as set(uri, diagnostics)
+      // -> convert into single-entry entries list
+      entries = [[uri, diagnostics]]
     }
-    let uri = entries
-    uri = URI.parse(uri).toString()
-    if (diagnostics) {
+
+    let diagnosticsPerFile: Map<string, Diagnostic[]> = new Map()
+    for (let item of entries) {
+      let [file, diagnostics] = item
+
+      if (diagnostics == null) {
+        // clear diagnostics if entry contains null
+        diagnostics = []
+      } else {
+        diagnostics = (diagnosticsPerFile.get(file) || []).concat(diagnostics)
+      }
+
+      diagnosticsPerFile.set(file, diagnostics)
+    }
+
+    for (let item of diagnosticsPerFile) {
+      let [uri, diagnostics] = item
+      uri = URI.parse(uri).toString()
+
       diagnostics.forEach(o => {
-        if (emptyRange(o.range)) {
+        let { range } = o
+        range.start = range.start || Position.create(0, 0)
+        range.end = range.end || Position.create(1, 0)
+        if (emptyRange(range)) {
           o.range.end = {
             line: o.range.end.line,
             character: o.range.end.character + 1
@@ -53,9 +59,10 @@ export default class Collection implements DiagnosticCollection {
         }
         o.source = o.source || this.name
       })
+
+      this.diagnosticsMap.set(uri, diagnostics)
+      this._onDidDiagnosticsChange.fire(uri)
     }
-    this.diagnosticsMap.set(uri, diagnostics || [])
-    this._onDidDiagnosticsChange.fire(uri)
     return
   }
 

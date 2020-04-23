@@ -9,7 +9,7 @@ import attach from '../attach'
 import Document from '../model/document'
 import Plugin from '../plugin'
 import workspace from '../workspace'
-import uuid = require('uuid/v4')
+import uuid from 'uuid/v4'
 import { VimCompleteItem } from '../types'
 
 export interface CursorPosition {
@@ -40,7 +40,7 @@ export class Helper extends Emitter {
     })
     let plugin = this.plugin = attach({ proc })
     this.nvim = plugin.nvim
-    this.nvim.uiAttach(80, 80, {}).catch(_e => {
+    this.nvim.uiAttach(160, 80, {}).catch(_e => {
       // noop
     })
     proc.on('exit', () => {
@@ -145,7 +145,9 @@ export class Helper extends Emitter {
   }
 
   public async edit(file?: string): Promise<Buffer> {
-    file = path.join(__dirname, file ? file : `${uuid()}`)
+    if (!file || !path.isAbsolute(file)) {
+      file = path.join(__dirname, file ? file : `${uuid()}`)
+    }
     let escaped = await this.nvim.call('fnameescape', file)
     await this.nvim.command(`edit ${escaped}`)
     await this.wait(60)

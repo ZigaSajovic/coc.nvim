@@ -54,7 +54,7 @@ export class DiagnosticBuffer implements Disposable {
     let bufnr: number
     sequence.addFunction(async () => {
       let arr = await nvim.eval(`[coc#util#valid_state(), bufwinid(${this.bufnr}), bufnr("%")]`) as [number, number, number]
-      if (arr[0] == 0 || !this.document) return false
+      if (arr[0] == 0 || !this.document) return true
       winid = arr[1]
       bufnr = arr[2]
     })
@@ -65,8 +65,8 @@ export class DiagnosticBuffer implements Disposable {
       this.setLocationlist(diagnostics, winid)
       this.addHighlight(diagnostics, winid)
       this.addDiagnosticVText(diagnostics)
-      let [, err] = await this.nvim.resumeNotification()
-      if (err) logger.error('Diagnostic error:', err)
+      let res = await this.nvim.resumeNotification()
+      if (Array.isArray(res) && res[1]) logger.error('Diagnostic error:', res[1])
     })
     sequence.start().then(async canceled => {
       if (!canceled) {

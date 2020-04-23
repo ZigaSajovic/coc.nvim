@@ -2,7 +2,8 @@ import { Buffer, Neovim } from '@chemzqm/neovim'
 import fastDiff from 'fast-diff'
 import path from 'path'
 import { Disposable } from 'vscode-languageserver-protocol'
-import { Location, Range, TextDocument, TextDocumentEdit, TextEdit, WorkspaceEdit } from 'vscode-languageserver-types'
+import { Location, Range, TextDocumentEdit, TextEdit, WorkspaceEdit } from 'vscode-languageserver-types'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { URI } from 'vscode-uri'
 import commands from '../commands'
 import Document from '../model/document'
@@ -377,7 +378,7 @@ export default class Refactor {
     this.changing = false
     nvim.pauseNotification()
     buffer.setOption('modified', false, true)
-    nvim.command('wa', true)
+    nvim.command('silent noa wa', true)
     this.highlightLineNr()
     await nvim.resumeNotification()
     return true
@@ -400,6 +401,7 @@ export default class Refactor {
     }
     if (this.changing) return
     let { uri } = e.textDocument
+    if (!('range' in e.contentChanges[0])) return
     let { range, text } = e.contentChanges[0]
     let filepath = URI.parse(uri).fsPath
     let fileItem = this.fileItems.find(o => o.filepath == filepath)
@@ -515,6 +517,7 @@ export default class Refactor {
     let { fileItems } = this
     if (!fileItems.length) return
     let change = e.contentChanges[0]
+    if (!('range' in change)) return
     let { original } = e
     if (change.range.end.line < 2) return
     doc.buffer.setOption('modified', true, true)

@@ -2,7 +2,7 @@ import { CompletionItem, CompletionItemKind, InsertTextFormat, Position } from '
 import { SnippetParser } from '../snippets/parser'
 import { CompleteOption } from '../types'
 import { byteSlice, characterIndex } from './string'
-const logger = require('./logger')('util-complete')
+// const logger = require('./logger')('util-complete')
 
 export function getPosition(opt: CompleteOption): Position {
   let { line, linenr, colnr } = opt
@@ -49,8 +49,8 @@ export function getWord(item: CompletionItem, opt: CompleteOption, invalidInsert
     && newText
     && newText.indexOf('$') !== -1) {
     let parser = new SnippetParser()
-    let snippet = parser.text(newText)
-    word = snippet ? getValidWord(snippet, invalidInsertCharacters) : label
+    let text = parser.text(newText)
+    word = text ? getValidWord(text, invalidInsertCharacters) : label
   } else {
     word = getValidWord(newText, invalidInsertCharacters) || label
   }

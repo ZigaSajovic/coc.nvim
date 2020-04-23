@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node-version: [10, 12, 13]
+        node-version: [10, 12, 13, 14]
 
     env:
       NODE_ENV: test
@@ -29,7 +29,7 @@ jobs:
       - name: Install yarn
         run: |
           curl --compressed -o- -L https://yarnpkg.com/install.sh | bash
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: yarn install
         run: |
           yarn global add typescript

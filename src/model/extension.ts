@@ -21,19 +21,17 @@ export interface Info {
   name?: string
 }
 
-function registryUrl(scope = ''): string {
+function registryUrl(scope = 'coc.nvim'): string {
   const result = rc('npm', { registry: 'https://registry.npmjs.org/' })
-  return result[`${scope}:registry`] || result.config_registry || result.registry
+  const registry = result[`${scope}:registry`] || result.config_registry || result.registry as string
+  return registry.endsWith('/') ? registry : registry + '/'
 }
 
 export default class ExtensionManager {
-  private checked = false
   constructor(private root: string) {
   }
 
   private checkFolder(): void {
-    if (this.checked) return
-    this.checked = true
     let { root } = this
     mkdirp.sync(root)
     mkdirp.sync(path.join(root, 'node_modules/.cache'))
@@ -76,11 +74,7 @@ export default class ExtensionManager {
   }
 
   private async _install(npm: string, def: string, info: Info, onMessage: (msg: string) => void): Promise<void> {
-    const filepath = path.join(os.tmpdir(), `${info.name}-`)
-    if (!fs.existsSync(path.dirname(filepath))) {
-      fs.mkdirSync(path.dirname(filepath))
-    }
-    let tmpFolder = await promisify(fs.mkdtemp)(filepath)
+    let tmpFolder = await promisify(fs.mkdtemp)(path.join(os.tmpdir(), `${info.name}-`))
     let url = info['dist.tarball']
     onMessage(`Downloading from ${url}`)
     await download(url, { dest: tmpFolder })
@@ -89,8 +83,8 @@ export default class ExtensionManager {
     if (dependencies && Object.keys(dependencies).length) {
       onMessage(`Installing dependencies.`)
       let p = new Promise<void>((resolve, reject) => {
-        let args = ['install', '--ignore-scripts', '--no-lockfile', '--no-bin-links', '--production']
-        if (info['dist.tarball'] && info['dist.tarball'].includes('github.com')) {
+        let args = ['install', '--ignore-scripts', '--no-lockfile', '--production']
+        if (info['dist.tarball'] && info['dist.tarball'].indexOf('github.com') !== -1) {
           args = ['install']
         }
         const child = spawn(npm, args, { cwd: tmpFolder })
@@ -177,7 +171,9 @@ export default class ExtensionManager {
   }
 
   private async getInfoFromUri(uri: string): Promise<Info> {
-    if (uri.indexOf('github.com') == -1) return
+    if (uri.indexOf('github.com') == -1) {
+      throw new Error(`"${uri}" is not supported, coc.nvim support github.com only`)
+    }
     uri = uri.replace(/\/$/, '')
     let fileUrl = uri.replace('github.com', 'raw.githubusercontent.com') + '/master/package.json'
     let content = await fetch(fileUrl)

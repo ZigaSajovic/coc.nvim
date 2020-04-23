@@ -48,7 +48,7 @@
         "rootPatterns": {
           "type": "array",
           "default": [],
-          "description": "Root patterns used for reoslve rootPath from current file, default to workspace root",
+          "description": "Root patterns used to resolve rootPath from current file, default to workspace root",
           "items": {
             "type": "string"
           }
@@ -69,7 +69,7 @@
         "filetypes": {
           "type": "array",
           "default": [],
-          "description": "Supported filetypes, use empty array for all filetypes.",
+          "description": "Supported filetypes, add * in array for all filetypes.",
           "items": {
             "type": "string"
           }
@@ -87,6 +87,11 @@
           "default": "never",
           "description": "Configure message level to show the output channel buffer",
           "enum": ["info", "warn", "error", "never"]
+        },
+        "progressOnInitialization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable progress report on languageserver initialize."
         },
         "initializationOptions": {
           "type": "object",
@@ -132,6 +137,7 @@
         "filetypes": {},
         "additionalSchemes": {},
         "revealOutputChannelOn": {},
+        "progressOnInitialization": {},
         "initializationOptions": {},
         "settings": {},
         "stdioEncoding": {},
@@ -193,6 +199,7 @@
         "filetypes": {},
         "additionalSchemes": {},
         "revealOutputChannelOn": {},
+        "progressOnInitialization": {},
         "initializationOptions": {},
         "stdioEncoding": {},
         "settings": {},
@@ -241,6 +248,7 @@
         "filetypes": {},
         "additionalSchemes": {},
         "revealOutputChannelOn": {},
+        "progressOnInitialization": {},
         "initializationOptions": {},
         "stdioEncoding": {},
         "settings": {},
@@ -258,6 +266,10 @@
       "type": "boolean",
       "default": true
     },
+    "https.rejectUnauthorized": {
+      "type": "boolean",
+      "default": true
+    },
     "npm.binPath": {
       "type": "string",
       "default": "npm",
@@ -266,7 +278,7 @@
     "suggest.enablePreselect": {
       "type": "boolean",
       "description": "Enable preselect feature, only works on neovim",
-      "default": true
+      "default": false
     },
     "suggest.maxPreviewWidth": {
       "type": "number",
@@ -364,7 +376,7 @@
       "type": "integer",
       "default": 5000,
       "minimum": 500,
-      "maximum": 5000,
+      "maximum": 15000,
       "description": "Timeout for completion, in miliseconds."
     },
     "suggest.minTriggerInputLength": {
@@ -464,6 +476,11 @@
       "description": "Invalid character for strip valid word when inserting text of complete item.",
       "default": [" ", "(", "<", "{", "[", "\r", "\n"]
     },
+    "suggest.asciiCharactersOnly": {
+      "type": "boolean",
+      "description": "Suggest ASCII characters only",
+      "default": false
+    },
     "diagnostic.enable": {
       "type": "boolean",
       "description": "Set to false to disable diagnostic display",
@@ -477,7 +494,7 @@
     },
     "diagnostic.checkCurrentLine": {
       "type": "boolean",
-      "description": "When enabled, show all diagnostics of current line instead of current position.",
+      "description": "When enabled, show all diagnostics of current line if there are none at the current position.",
       "default": false
     },
     "diagnostic.messageTarget": {
@@ -536,6 +553,11 @@
       "default": true,
       "description": "Enable signs for diagnostics."
     },
+    "diagnostic.enableHighlightLineNumber": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable highlighting line numbers for diagnostics, only works with neovim and diagnostic.enableSign is true."
+    },
     "diagnostic.enableMessage": {
       "type": "string",
       "default": "always",
@@ -591,6 +613,16 @@
       "type": "object",
       "description": "A map between buffer filetype and the filetype assigned to diagnostics. To syntax highlight diagnostics withs their parent buffer type use '\"default\": \"bufferType\"'",
       "default": {}
+    },
+    "diagnostic.format": {
+      "type": "string",
+      "description": "Define the diagnostic format. Available parts: source, code, severity, message",
+      "default": "[%source%code] [%severity] %message"
+    },
+    "diagnostic.separateRelatedInformationAsDiagnostics": {
+      "type": "boolean",
+      "default": false,
+      "description": "Separate related information as diagnostics"
     },
     "signature.enable": {
       "type": "boolean",
@@ -765,6 +797,16 @@
       "default": "<C-p>",
       "description": "Key used for jump to previous cursors position."
     },
+    "coc.preferences.maxFileSize": {
+      "type": "string",
+      "default": "10MB",
+      "description": "Maximum file size in bytes that coc.nvim should handle, default '10MB'"
+    },
+    "coc.preferences.promptWorkspaceEdit": {
+      "type": "boolean",
+      "description": "Prompt confirm from user for workspace edit.",
+      "default": true
+    },
     "coc.preferences.useQuickfixForLocations": {
       "type": "boolean",
       "description": "Use vim's quickfix list for jump locations,\n need restart on change.",
@@ -821,7 +863,7 @@
     },
     "coc.preferences.rootPatterns": {
       "type": "array",
-      "default": [".vim", ".git", ".hg", ".projections.json"],
+      "default": [".git", ".hg", ".projections.json"],
       "description": "Root patterns to resolve workspaceFolder from parent folders of opened files, resolved from up to down.",
       "items": {
         "type": "string"
@@ -852,6 +894,14 @@
       "type": "boolean",
       "description": "Set to true to enable format on type",
       "default": false
+    },
+    "coc.preferences.formatOnTypeFiletypes": {
+      "type": "array",
+      "default": [],
+      "description": "Filetypes that should run format on typing. Only take effect when `coc.preferences.formatOnType` set `true`",
+      "items": {
+        "type": "string"
+      }
     },
     "coc.preferences.highlightTimeout": {
       "type": "integer",

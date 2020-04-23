@@ -10,7 +10,7 @@ import FloatFactory from '../model/floatFactory'
 import { TextDocumentContentProvider } from '../provider'
 import services from '../services'
 import snippetManager from '../snippets/manager'
-import { CodeAction, Documentation } from '../types'
+import { CodeAction, Documentation, TagDefinition } from '../types'
 import { disposeAll, wait } from '../util'
 import { getSymbolKind } from '../util/convert'
 import { equals } from '../util/object'
@@ -23,6 +23,7 @@ import DocumentHighlighter from './documentHighlight'
 import Refactor from './refactor'
 import Search from './search'
 import debounce = require('debounce')
+import { URI } from 'vscode-uri'
 const logger = require('../util/logger')('Handler')
 const pairs: Map<string, string> = new Map([
   ['<', '>'],
@@ -63,6 +64,7 @@ interface Preferences {
   triggerSignatureHelp: boolean
   triggerSignatureWait: number
   formatOnType: boolean
+  formatOnTypeFiletypes: string[]
   formatOnInsertLeave: boolean
   hoverTarget: string
   previewAutoClose: boolean
@@ -526,6 +528,25 @@ export default class Handler {
     return 0
   }
 
+  public async getTagList(): Promise<TagDefinition[] | null> {
+    let position = await workspace.getCursorPosition()
+    let document = await workspace.document
+    let word = await this.nvim.call('expand', '<cword>')
+    if (!word) return null
+    if (!languages.hasProvider('definition', document.textDocument)) {
+      return null
+    }
+    let definitions = await languages.getDefinition(document.textDocument, position)
+    return definitions.map(location => {
+      const filename = URI.parse(location.uri).fsPath
+      return {
+        name: word,
+        cmd: `keepjumps ${location.range.start.line + 1} | normal ${location.range.start.character + 1}|`,
+        filename,
+      }
+    })
+  }
+
   public async runCommand(id?: string, ...args: any[]): Promise<any> {
     if (id) {
       await events.fire('Command', [id])
@@ -542,6 +563,10 @@ export default class Handler {
   public async getCodeActions(bufnr: number, range?: Range, only?: CodeActionKind[]): Promise<CodeAction[]> {
     let document = workspace.getDocument(bufnr)
     if (!document) return []
+    if (!range) {
+      const position = await workspace.getCursorPosition()
+      range = document.getWordRangeAtPosition(position)
+    }
     if (!range) {
       let lnum = await this.nvim.call('line', ['.'])
       range = {
@@ -659,7 +684,7 @@ export default class Handler {
     }
     let ranges = await languages.provideFoldingRanges(document.textDocument, {})
     if (ranges == null) {
-      workspace.showMessage('no range provider found', 'warning')
+      workspace.showMessage('no folding range provider found', 'warning')
       return false
     }
     if (!ranges || ranges.length == 0) {
@@ -803,6 +828,11 @@ export default class Handler {
     let doc = workspace.getDocument(bufnr)
     if (!doc || doc.paused) return
     if (!languages.hasOnTypeProvider(ch, doc.textDocument)) return
+    const filetypes = this.preferences.formatOnTypeFiletypes
+    if (filetypes.length && !filetypes.includes(doc.filetype)) {
+      // Only check formatOnTypeFiletypes when set, avoid breaking change
+      return
+    }
     let position = await workspace.getCursorPosition()
     let origLine = doc.getline(position.line)
     let { changedtick, dirty } = doc
@@ -1211,6 +1241,7 @@ export default class Handler {
       signatureFloatMaxWidth: signatureConfig.get<number>('floatMaxWidth', 80),
       signatureHideOnChange: signatureConfig.get<boolean>('hideOnTextChange', false),
       formatOnType: config.get<boolean>('formatOnType', false),
+      formatOnTypeFiletypes: config.get('formatOnTypeFiletypes', []),
       formatOnInsertLeave: config.get<boolean>('formatOnInsertLeave', false),
       bracketEnterImprove: config.get<boolean>('bracketEnterImprove', true),
       previewAutoClose: config.get<boolean>('previewAutoClose', false),

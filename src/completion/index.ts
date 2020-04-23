@@ -131,8 +131,8 @@ export class Completion implements Disposable {
       previewIsKeyword: getConfig<string>('previewIsKeyword', '@,48-57,_192-255'),
       enablePreview: getConfig<boolean>('enablePreview', false),
       enablePreselect: getConfig<boolean>('enablePreselect', false),
-      maxPreviewWidth: getConfig<number>('maxPreviewWidth', 50),
-      labelMaxLength: getConfig<number>('labelMaxLength', 100),
+      maxPreviewWidth: getConfig<number>('maxPreviewWidth', 80),
+      labelMaxLength: getConfig<number>('labelMaxLength', 200),
       triggerAfterInsertEnter: getConfig<boolean>('triggerAfterInsertEnter', false),
       noselect: getConfig<boolean>('noselect', true),
       numberSelect: getConfig<boolean>('numberSelect', false),
@@ -144,6 +144,7 @@ export class Completion implements Disposable {
       localityBonus: getConfig<boolean>('localityBonus', true),
       highPrioritySourceLimit: getConfig<number>('highPrioritySourceLimit', null),
       lowPrioritySourceLimit: getConfig<number>('lowPrioritySourceLimit', null),
+      asciiCharactersOnly: getConfig<boolean>('asciiCharactersOnly', false)
     }
   }
 

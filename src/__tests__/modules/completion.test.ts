@@ -324,6 +324,28 @@ describe('completion TextChangedP', () => {
     expect(col).toBe(7)
   })
 
+  it('should adjust completion position by textEdit start position', async () => {
+    let provider: CompletionItemProvider = {
+      provideCompletionItems: async (_document, _position, _token, context): Promise<CompletionItem[]> => {
+        if (!context.triggerCharacter) return
+        return [{
+          label: 'foo',
+          textEdit: {
+            range: Range.create(0, 0, 0, 1),
+            newText: '?foo'
+          }
+        }]
+      }
+    }
+    disposables.push(languages.registerCompletionItemProvider('fix', 'f', null, provider, ['?']))
+    await nvim.input('i?')
+    await helper.waitPopup()
+    await nvim.eval('feedkeys("\\<C-n>", "in")')
+    await helper.wait(200)
+    let line = await nvim.line
+    expect(line).toBe('?foo')
+  })
+
   it('should fix cursor position with snippet on additionalTextEdits', async () => {
     await helper.createDocument()
     let provider: CompletionItemProvider = {
@@ -437,6 +459,31 @@ describe('completion TextChangedP', () => {
     await helper.wait(100)
     let items = await helper.getItems()
     expect(items[0].word).toBe('foo#abc')
+  })
+
+  it('should use source-provided score', async () => {
+    let source: ISource = {
+      priority: 0,
+      enable: true,
+      name: 'source',
+      sourceType: SourceType.Service,
+      doComplete: (_opt: CompleteOption): Promise<CompleteResult> => {
+        return Promise.resolve({
+          items: [
+            { word: 'candidate_a', sourceScore: 0.1 },
+            { word: 'candidate_b', sourceScore: 10 },
+            { word: 'candidate_c' },
+          ]
+        })
+      },
+    }
+    disposables.push(sources.addSource(source))
+    await nvim.input('ocand')
+    await helper.waitPopup()
+    let items = await helper.getItems()
+    expect(items[0].word).toBe('candidate_b')
+    expect(items[1].word).toBe('candidate_c')
+    expect(items[2].word).toBe('candidate_a')
   })
 
   it('should do resolve for complete item', async () => {

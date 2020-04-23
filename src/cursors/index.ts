@@ -2,7 +2,8 @@ import { Neovim } from '@chemzqm/neovim'
 import fastDiff from 'fast-diff'
 import debounce from 'debounce'
 import { Disposable } from 'vscode-jsonrpc'
-import { Position, Range, TextDocument, TextEdit } from 'vscode-languageserver-types'
+import { Position, Range, TextEdit } from 'vscode-languageserver-types'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import events from '../events'
 import Document from '../model/document'
 import { disposeAll } from '../util'
@@ -141,6 +142,7 @@ export default class Cursors {
       if (e.textDocument.uri != doc.uri) return
       if (doc.version - this.version == 1 || !this.ranges.length) return
       let change = e.contentChanges[0]
+      if (!('range' in change)) return
       let { original } = e
       let { text, range } = change
       // ignore change after last range

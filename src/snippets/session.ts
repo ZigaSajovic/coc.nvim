@@ -120,7 +120,7 @@ export class SnippetSession {
 
   public async synchronizeUpdatedPlaceholders(change: TextDocumentContentChangeEvent): Promise<void> {
     if (!this.isActive || !this.document || this.document.version - this.version == 1) return
-    let edit: TextEdit = { range: change.range, newText: change.text }
+    let edit: TextEdit = { range: (change as any).range, newText: change.text }
     let { snippet } = this
     // change outside range
     let adjusted = snippet.adjustTextEdit(edit)
@@ -253,9 +253,8 @@ export class SnippetSession {
   }
 
   public findPlaceholder(range: Range): CocSnippetPlaceholder | null {
-    if (!this.snippet) return null
     let { placeholder } = this
-    if (rangeInRange(range, placeholder.range)) return placeholder
+    if (placeholder && rangeInRange(range, placeholder.range)) return placeholder
     return this.snippet.getPlaceholderByRange(range) || null
   }
 

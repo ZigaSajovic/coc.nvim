@@ -1,4 +1,5 @@
-import { Position, Range, TextDocument, TextEdit } from 'vscode-languageserver-protocol'
+import { Position, Range, TextEdit } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { adjustPosition, comparePosition, editRange, getChangedPosition, rangeInRange } from '../util/position'
 import * as Snippets from "./parser"
 import { VariableResolver } from './parser'
@@ -14,6 +15,7 @@ export interface CocSnippetPlaceholder {
   value: string
   isFinalTabstop: boolean
   transform: boolean
+  isVariable: boolean
   choice?: string[]
   snippet: CocSnippet
 }
@@ -43,15 +45,16 @@ export class CocSnippet {
     this.update()
   }
 
+  // adjust for edit before snippet
   public adjustTextEdit(edit: TextEdit): boolean {
-    let { range } = edit
+    let { range, newText } = edit
     if (comparePosition(this.range.start, range.end) < 0) return false
-    if (edit.newText.indexOf('\n') == -1 &&
-      this.firstPlaceholder &&
-      comparePosition(this.firstPlaceholder.range.start, this.range.start) == 0 &&
-      comparePosition(range.start, range.end) == 0 &&
-      comparePosition(this.range.start, range.start) == 0) {
-      return false
+    // check change of placeholder at beginning
+    if (newText.indexOf('\n') == -1
+      && comparePosition(range.start, range.end) == 0
+      && comparePosition(this.range.start, range.start) == 0) {
+      let idx = this._placeholders.findIndex(o => comparePosition(o.range.start, range.start) == 0)
+      if (idx !== -1) return false
     }
     let changed = getChangedPosition(this.range.start, edit)
     if (changed.line == 0 && changed.character == 0) return true
@@ -77,11 +80,24 @@ export class CocSnippet {
   }
 
   public get firstPlaceholder(): CocSnippetPlaceholder | null {
-    return this.getPlaceholder(this.tmSnippet.minIndexNumber)
+    let index = 0
+    for (let p of this._placeholders) {
+      if (p.index == 0) continue
+      if (index == 0 || p.index < index) {
+        index = p.index
+      }
+    }
+    return this.getPlaceholder(index)
   }
 
   public get lastPlaceholder(): CocSnippetPlaceholder {
-    return this.getPlaceholder(this.tmSnippet.maxIndexNumber)
+    let index = 0
+    for (let p of this._placeholders) {
+      if (index == 0 || p.index > index) {
+        index = p.index
+      }
+    }
+    return this.getPlaceholder(index)
   }
 
   public getPlaceholderById(id: number): CocSnippetPlaceholder {
@@ -102,8 +118,9 @@ export class CocSnippet {
   }
 
   public getNextPlaceholder(index: number): CocSnippetPlaceholder {
-    let max = this.tmSnippet.maxIndexNumber
-    if (index == max) return this.finalPlaceholder
+    let indexes = this._placeholders.map(o => o.index)
+    let max = Math.max.apply(null, indexes)
+    if (index >= max) return this.finalPlaceholder
     let next = this.getPlaceholder(index + 1)
     if (!next) return this.getNextPlaceholder(index + 1)
     return next
@@ -154,7 +171,11 @@ export class CocSnippet {
         }
       }
     }
-    this.tmSnippet.updatePlaceholder(id, newText)
+    if (placeholder.isVariable) {
+      this.tmSnippet.updateVariable(id, newText)
+    } else {
+      this.tmSnippet.updatePlaceholder(id, newText)
+    }
     let endPosition = adjustPosition(range.end, edit)
     let snippetEdit: TextEdit = {
       range: Range.create(range.start, endPosition),
@@ -166,16 +187,32 @@ export class CocSnippet {
 
   private update(): void {
     const snippet = this.tmSnippet
-    const placeholders = snippet.placeholders
     const { line, character } = this.position
     const document = TextDocument.create('untitled:/1', 'snippet', 0, snippet.toString())
+    const { placeholders, variables, maxIndexNumber } = snippet
+    const variableIndexMap: Map<string, number> = new Map()
+    let variableIndex = maxIndexNumber + 1
 
-    this._placeholders = placeholders.map((p, idx) => {
+    this._placeholders = [...placeholders, ...variables].map((p, idx) => {
       const offset = snippet.offset(p)
       const position = document.positionAt(offset)
       const start: Position = {
         line: line + position.line,
         character: position.line == 0 ? character + position.character : position.character
+      }
+      let index: number
+      if (p instanceof Snippets.Variable) {
+        let key = p.name
+        if (variableIndexMap.has(key)) {
+          index = variableIndexMap.get(key)
+        } else {
+          variableIndexMap.set(key, variableIndex)
+          index = variableIndex
+          variableIndex = variableIndex + 1
+        }
+        // variableIndex = variableIndex + 1
+      } else {
+        index = p.index
       }
       const value = p.toString()
       const lines = value.split('\n')
@@ -187,15 +224,16 @@ export class CocSnippet {
         transform: p.transform != null,
         line: start.line,
         id: idx,
-        index: p.index,
+        index,
         value,
-        isFinalTabstop: p.isFinalTabstop,
+        isVariable: p instanceof Snippets.Variable,
+        isFinalTabstop: (p as Snippets.Placeholder).index === 0,
         snippet: this
       }
       Object.defineProperty(res, 'snippet', {
         enumerable: false
       })
-      if (p.choice) {
+      if (p instanceof Snippets.Placeholder && p.choice) {
         let { options } = p.choice
         if (options && options.length) {
           res.choice = options.map(o => o.value)

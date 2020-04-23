@@ -26,6 +26,9 @@ export default class Mappings {
     this.add('insert', '<C-p>', () => {
       manager.history.previous()
     })
+    this.add('insert', '<C-v>', async () => {
+      await prompt.paste()
+    })
     this.add('insert', '<C-s>', () => {
       return manager.switchMatcher()
     })
@@ -162,7 +165,9 @@ export default class Mappings {
       if (key.length == 1) {
         res.set(key, value)
       } else if (key.startsWith('<') && key.endsWith('>')) {
-        if (validKeys.indexOf(key) != -1) {
+        if (key.toLowerCase() == '<space>') {
+          res.set(' ', value)
+        } else if (validKeys.indexOf(key) != -1) {
           res.set(key, value)
         } else {
           let find = false

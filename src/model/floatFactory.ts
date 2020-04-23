@@ -92,7 +92,9 @@ export default class FloatFactory implements Disposable {
         nvim.pauseNotification()
         win.setVar('float', 1, true)
         win.setOption('linebreak', true, true)
-        win.setOption('showbreak', '', true)
+        if (workspace.isVim && parseInt(workspace.env.version, 10) >= 8012281) {
+          win.setOption('showbreak', 'NONE', true)
+        }
         win.setOption('conceallevel', 2, true)
         await nvim.resumeNotification()
       }
@@ -138,11 +140,13 @@ export default class FloatFactory implements Disposable {
     if (alignTop) docs.reverse()
     await this.floatBuffer.setDocuments(docs, maxWidth)
     let { width } = this.floatBuffer
-    if (offsetX) {
-      offsetX = Math.min(col - 1, offsetX)
-      if (col - offsetX + width > columns) {
-        offsetX = col - offsetX + width - columns
-      }
+    // Ensure the floating window isn't tiny if the cursor is on the right:
+    // increase the offset to accommodate some minimum width.
+    // If we have offsetX, precise positioning is intended, force exact width.
+    let minWidth = offsetX ? width : Math.min(width, 50, maxWidth)
+    offsetX = Math.min(col - 1, offsetX)
+    if (col - offsetX + minWidth > columns) {
+      offsetX = col - offsetX + minWidth - columns
     }
     this.alignTop = alignTop
     return {
@@ -188,12 +192,13 @@ export default class FloatFactory implements Disposable {
       if (!reuse) this.window = await nvim.openFloatWindow(this.buffer, false, config)
     }
     if (token.isCancellationRequested) return false
+    let showBottom = alignTop && docs.length > 1
     nvim.pauseNotification()
     if (workspace.isNvim) {
       if (!reuse) {
         nvim.command(`noa call win_gotoid(${this.window.id})`, true)
         this.window.setVar('float', 1, true)
-        nvim.command(`setl nospell nolist wrap linebreak foldcolumn=1`, true)
+        nvim.command(`setl nospell nolist wrap linebreak foldcolumn=1 showbreak=`, true)
         nvim.command(`setl nonumber norelativenumber nocursorline nocursorcolumn colorcolumn=`, true)
         nvim.command(`setl signcolumn=no conceallevel=2 concealcursor=n`, true)
         nvim.command(`setl winhl=Normal:CocFloating,NormalNC:CocFloating,FoldColumn:CocFloating`, true)
@@ -203,7 +208,7 @@ export default class FloatFactory implements Disposable {
         nvim.command(`noa call win_gotoid(${this.window.id})`, true)
       }
       this.floatBuffer.setLines()
-      nvim.command(`normal! ${alignTop ? 'G' : 'gg'}0`, true)
+      nvim.command(`normal! ${showBottom ? 'G' : 'gg'}0`, true)
       nvim.command('noa wincmd p', true)
     } else {
       let filetypes = distinct(docs.map(d => d.filetype))
@@ -216,8 +221,8 @@ export default class FloatFactory implements Disposable {
         minwidth: config.width - 2,
         minheight: config.height,
         maxwidth: config.width - 2,
-        maxheight: config.height,
-        firstline: alignTop ? -1 : 1
+        maxheight: this.maxHeight,
+        firstline: showBottom ? -1 : 1
       })
       this.floatBuffer.setLines()
       nvim.command('redraw', true)

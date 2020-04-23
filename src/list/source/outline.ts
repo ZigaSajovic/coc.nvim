@@ -4,7 +4,7 @@ import { URI } from 'vscode-uri'
 import which from 'which'
 import languages from '../../languages'
 import Document from '../../model/document'
-import { ListContext, ListItem } from '../../types'
+import { ListContext, ListItem, ListArgument } from '../../types'
 import { runCommand } from '../../util'
 import { writeFile } from '../../util/fs'
 import workspace from '../../workspace'
@@ -12,6 +12,10 @@ import LocationList from './location'
 import { getSymbolKind } from '../../util/convert'
 import { Neovim } from '@chemzqm/neovim'
 const logger = require('../../util/logger')('list-symbols')
+
+function getFilterText(s: DocumentSymbol | SymbolInformation, kind: string | null): string {
+  return `${s.name}${kind ? ` ${kind}` : ''}`
+}
 
 export default class Outline extends LocationList {
   public readonly description = 'symbols of current document'
@@ -26,6 +30,11 @@ export default class Outline extends LocationList {
     this.addLocationActions()
   }
 
+  public options: ListArgument[] = [{
+    name: '-k, -kind KIND',
+    hasValue: true,
+    description: 'filters also by kind',
+  }]
 
   public async loadItems(context: ListContext): Promise<ListItem[]> {
     let buf = await context.window.buffer
@@ -34,11 +43,13 @@ export default class Outline extends LocationList {
     let config = this.getConfig()
     let ctagsFilestypes = config.get<string[]>('ctagsFilestypes', [])
     let symbols: DocumentSymbol[] | SymbolInformation[] | null
+    let args = this.parseArguments(context.args)
     if (ctagsFilestypes.indexOf(document.filetype) == -1) {
       symbols = await languages.getDocumentSymbol(document.textDocument)
     }
     if (!symbols) return await this.loadCtagsSymbols(document)
     if (symbols.length == 0) return []
+    let filterKind = args.kind ? (args.kind as string).toLowerCase() : null
     let items: ListItem[] = []
     let isSymbols = !symbols[0].hasOwnProperty('location')
     if (isSymbols) {
@@ -51,8 +62,9 @@ export default class Outline extends LocationList {
           let location = Location.create(document.uri, s.selectionRange)
           items.push({
             label: `${' '.repeat(level * 2)}${s.name}\t[${kind}]\t${s.range.start.line + 1}`,
-            filterText: s.name,
-            location
+            filterText: getFilterText(s, args.kind == '' ? kind : null),
+            location,
+            data: { kind }
           })
           if (s.children && s.children.length) {
             addSymbols(allowed_kinds, s.children, level + 1)
@@ -60,6 +72,9 @@ export default class Outline extends LocationList {
         }
       }
       addSymbols(this.allowed_kinds, symbols as DocumentSymbol[])
+      if (filterKind) {
+        items = items.filter(o => o.data.kind.toLowerCase().indexOf(filterKind) == 0)
+      }
     } else {
       (symbols as SymbolInformation[]).sort((a, b) => {
         let sa = a.location.range.start
@@ -72,12 +87,15 @@ export default class Outline extends LocationList {
         if (this.allowed_kinds.length != 0 && !this.allowed_kinds.includes(kind))
           continue;
         if (s.name.endsWith(') callback')) continue
+        if (filterKind && kind.toLowerCase().indexOf(filterKind) != 0) {
+          continue
+        }
         if (s.location.uri === undefined) {
           s.location.uri = document.uri
         }
         items.push({
           label: `${s.name} [${kind}] ${s.location.range.start.line + 1}`,
-          filterText: `${s.name}`,
+          filterText: getFilterText(s, args.kind == '' ? kind : null),
           location: s.location
         })
       }

@@ -244,7 +244,7 @@ export default class Configurations {
         } else {
           model.setValue(s, value)
         }
-        if (!this.workspaceConfigFile && this._proxy) {
+        if (target == ConfigurationTarget.Workspace && !this.workspaceConfigFile && this._proxy) {
           let file = this.workspaceConfigFile = this._proxy.workspaceConfigFile
           if (!fs.existsSync(file)) {
             let folder = path.dirname(file)
@@ -306,7 +306,6 @@ export default class Configurations {
   }
 
   public checkFolderConfiguration(uri: string): void {
-    logger.debug(`checkFolderConfiguration: ${uri}`)
     let u = URI.parse(uri)
     if (u.scheme != 'file') return
     let rootPath = path.dirname(u.fsPath)
@@ -315,7 +314,6 @@ export default class Configurations {
       if (folder && folder != os.homedir()) {
         let file = path.join(folder, 'coc-settings.json')
         if (fs.existsSync(file)) {
-          logger.debug(`checkFolderConfiguration: add folder setting file ${file}`)
           this.addFolderFile(file)
         }
       }

@@ -1,7 +1,8 @@
-import { Neovim, Window } from '@chemzqm/neovim'
+import { Neovim, Window, Buffer } from '@chemzqm/neovim'
 import { RequestOptions } from 'http'
 import log4js from 'log4js'
-import { CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocument, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder } from 'vscode-languageserver-protocol'
+import { CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder } from 'vscode-languageserver-protocol'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { URI } from 'vscode-uri'
 import Configurations from './configuration'
 import { LanguageClient } from './language-client'
@@ -45,7 +46,14 @@ export interface KeymapOption {
   repeat: boolean
 }
 
+export interface TagDefinition {
+  name: string
+  cmd: string
+  filename: string
+}
+
 export interface Autocmd {
+  pattern?: string
   event: string | string[]
   arglist?: string[]
   request?: boolean
@@ -230,6 +238,7 @@ export interface Terminal {
 export interface Env {
   completeOpt: string
   runtimepath: string
+  readonly guicursor: string
   readonly mode: string
   readonly floating: boolean
   readonly extensionRoot: string
@@ -246,6 +255,7 @@ export interface Env {
   readonly isVim: boolean
   readonly isCygwin: boolean
   readonly isMacvim: boolean
+  readonly isiTerm: boolean
   readonly version: string
   readonly locationlist: boolean
   readonly progpath: string
@@ -279,8 +289,6 @@ export interface SnippetManager {
   nextPlaceholder(): Promise<void>
   previousPlaceholder(): Promise<void>
 }
-
-export type ModuleResolve = () => Promise<string>
 
 export type MapMode = 'n' | 'i' | 'v' | 'x' | 's' | 'o'
 
@@ -324,7 +332,7 @@ export interface ConfigurationChangeEvent {
 }
 
 export interface LanguageServerConfig {
-  module?: string | ModuleResolve
+  module?: string
   command?: string
   transport?: string
   transportPort?: number
@@ -347,6 +355,7 @@ export interface LanguageServerConfig {
   rootPatterns?: string[]
   ignoredRootPaths?: string[]
   initializationOptions?: any
+  progressOnInitialization?: boolean
   revealOutputChannelOn?: string
   configSection?: string
   stdioEncoding?: string
@@ -389,6 +398,7 @@ export interface ChangeItem {
 
 export interface BufferOption {
   eol: number
+  size: number
   variables: { [key: string]: any }
   bufname: string
   fullpath: string
@@ -477,6 +487,7 @@ export interface VimCompleteItem {
   // it's not saved by vim, for temporarily usage
   score?: number
   sortText?: string
+  sourceScore?: number
   filterText?: string
   isSnippet?: boolean
   source?: string
@@ -595,6 +606,7 @@ export interface CompleteConfig {
   lowPrioritySourceLimit: number
   removeDuplicateItems: boolean
   defaultSortMethod: string
+  asciiCharactersOnly: boolean
 }
 
 export interface WorkspaceConfiguration {
@@ -661,6 +673,14 @@ export interface ConfigurationInspect<T> {
 export interface RenameEvent {
   oldUri: URI
   newUri: URI
+}
+
+export interface OpenTerminalOption {
+  cwd?: string
+  // default true
+  autoclose?: boolean
+  // default false
+  keepfocus?: boolean
 }
 
 export interface TerminalResult {
@@ -783,6 +803,7 @@ export interface ListContext {
   cwd: string
   options: ListOptions
   window: Window
+  buffer: Buffer
   listWindow: Window
 }
 
@@ -1109,9 +1130,9 @@ export interface OutputChannel {
   appendLine(value: string): void
 
   /**
-   * Removes all output from the channel.
+   * Removes output from the channel. Latest `keep` lines will be remained.
    */
-  clear(): void
+  clear(keep?: number): void
 
   /**
    * Reveal this channel in the UI.

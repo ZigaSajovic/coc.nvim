@@ -1,7 +1,6 @@
 import { Disposable } from 'vscode-languageserver-protocol'
 import { PopupChangeEvent, VimCompleteItem } from './types'
 import { disposeAll } from './util'
-import workspace from './workspace'
 const logger = require('./util/logger')('events')
 
 export type Result = void | Promise<void>
@@ -10,7 +9,7 @@ export type BufEvents = 'TextChangedI' | 'BufHidden' | 'BufEnter' | 'TextChanged
   | 'BufWritePost' | 'CursorHold' | 'InsertLeave' | 'TermOpen' | 'TermClose' | 'InsertEnter'
   | 'BufCreate' | 'BufUnload' | 'BufWritePre' | 'CursorHoldI' | 'TextChangedP' | 'Enter'
 
-export type EmptyEvents = 'FocusGained'
+export type EmptyEvents = 'FocusGained' | 'VimLeave'
 
 export type TextChangedEvent = 'TextChanged'
 
@@ -44,7 +43,7 @@ class Events {
 
   public async fire(event: string, args: any[]): Promise<void> {
     logger.debug('Event:', event, args)
-    let handlers = this.handlers.get(event)
+    let cbs = this.handlers.get(event)
     if (event == 'InsertEnter') {
       this.insertMode = true
     } else if (event == 'InsertLeave') {
@@ -64,14 +63,17 @@ class Events {
         insert: event == 'CursorMovedI'
       }
     }
-    if (handlers) {
+    if (cbs) {
       try {
-        await Promise.all(handlers.map(fn => {
-          return Promise.resolve(fn.apply(null, args))
+        await Promise.all(cbs.map(fn => {
+          return fn(args)
         }))
       } catch (e) {
-        logger.error(`Error on ${event}: `, e.stack)
-        workspace.showMessage(`Error on ${event}: ${e.message} `, 'error')
+        if (e.message) {
+          // tslint:disable-next-line: no-console
+          console.error(`Error on ${event}: ${e.message}${e.stack ? '\n' + e.stack : ''} `)
+        }
+        logger.error(`Handler Error on ${event}`, e.stack)
       }
     }
   }
@@ -95,16 +97,32 @@ class Events {
   public on(event: 'InputChar', handler: (character: string, mode: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: AllEvents[] | AllEvents, handler: (...args: any[]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable {
     if (Array.isArray(event)) {
-      let disposables: Disposable[] = []
+      let arr = disposables || []
       for (let ev of event) {
-        disposables.push(this.on(ev as any, handler, thisArg, disposables))
+        this.on(ev as any, handler, thisArg, arr)
       }
       return Disposable.create(() => {
-        disposeAll(disposables)
+        disposeAll(arr)
       })
     } else {
       let arr = this.handlers.get(event) || []
-      arr.push(handler.bind(thisArg || null))
+      let limit = 1000
+      let stack = Error().stack
+      arr.push(args => {
+        return new Promise(async (resolve, reject) => {
+          let timer = setTimeout(() => {
+            logger.warn(`Handler of ${event} cost more than 1s`, stack)
+          }, limit)
+          try {
+            await Promise.resolve(handler.apply(thisArg || null, args))
+            clearTimeout(timer)
+            resolve()
+          } catch (e) {
+            clearTimeout(timer)
+            reject(e)
+          }
+        })
+      })
       this.handlers.set(event, arr)
       let disposable = Disposable.create(() => {
         let idx = arr.indexOf(handler)
