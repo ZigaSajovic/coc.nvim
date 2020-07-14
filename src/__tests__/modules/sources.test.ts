@@ -29,9 +29,7 @@ describe('sources', () => {
       priority: 0,
       sourceType: SourceType.Service,
       triggerCharacters: [],
-      doComplete: () => {
-        return Promise.resolve({ items: [] })
-      },
+      doComplete: () => Promise.resolve({ items: [] }),
       onEnter: fn
     }
     sources.addSource(source)
@@ -51,6 +49,14 @@ describe('sources', () => {
     let s = sources.getSource('around')
     expect(s.enable).toBe(false)
     sources.toggleSource('around')
+  })
+
+  it('should disable source by coc_sources_disable_map', async () => {
+    await nvim.command('let g:coc_sources_disable_map = {"python": ["around", "buffer"]}')
+    let res = sources.getNormalSources('python')
+    await nvim.command('let g:coc_sources_disable_map = {}')
+    expect(res.find(o => o.name == 'around')).toBeUndefined()
+    expect(res.find(o => o.name == 'buffer')).toBeUndefined()
   })
 })
 
@@ -74,9 +80,7 @@ describe('sources#refresh', () => {
       priority: 0,
       sourceType: SourceType.Service,
       triggerCharacters: [],
-      doComplete: () => {
-        return Promise.resolve({ items: [] })
-      },
+      doComplete: () => Promise.resolve({ items: [] }),
       refresh: fn
     }
     sources.addSource(source)
@@ -92,9 +96,7 @@ describe('sources#refresh', () => {
       priority: 0,
       sourceType: SourceType.Service,
       triggerCharacters: [],
-      doComplete: () => {
-        return Promise.resolve({ items: [] })
-      }
+      doComplete: () => Promise.resolve({ items: [] })
     }
     sources.addSource(source)
     await sources.refresh('refresh')
@@ -106,13 +108,11 @@ describe('sources#createSource', () => {
   it('should create source', async () => {
     let disposable = sources.createSource({
       name: 'custom',
-      doComplete: () => {
-        return Promise.resolve({
-          items: [{
-            word: 'custom'
-          }]
-        })
-      }
+      doComplete: () => Promise.resolve({
+        items: [{
+          word: 'custom'
+        }]
+      })
     })
     await helper.createDocument()
     await nvim.input('i')

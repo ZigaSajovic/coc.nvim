@@ -2,7 +2,7 @@ import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import uuid from 'uuid/v4'
+import { v4 as uuid } from 'uuid'
 import { Disposable, Emitter } from 'vscode-languageserver-protocol'
 import { CreateFile, DeleteFile, Location, Position, Range, RenameFile, TextDocumentEdit, TextEdit, VersionedTextDocumentIdentifier, WorkspaceEdit } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
@@ -35,7 +35,7 @@ afterEach(async () => {
 describe('workspace properties', () => {
 
   it('should have initialized', () => {
-    let { nvim, workspaceFolders, channelNames, rootPath, cwd, documents, initialized, textDocuments } = workspace
+    let { nvim, channelNames, rootPath, cwd, documents, initialized, textDocuments } = workspace
     expect(nvim).toBeTruthy()
     expect(initialized).toBe(true)
     expect(channelNames.length).toBe(0)
@@ -43,7 +43,6 @@ describe('workspace properties', () => {
     expect(textDocuments.length).toBe(1)
     expect(rootPath).toBe(process.cwd())
     expect(cwd).toBe(process.cwd())
-    expect(workspaceFolders.length).toBe(0)
   })
 
   it('should add workspaceFolder', async () => {
@@ -62,7 +61,7 @@ describe('workspace properties', () => {
 
   it('should return plugin root', () => {
     let { pluginRoot } = workspace
-    expect(pluginRoot).toBe(process.cwd())
+    expect(typeof pluginRoot).toBe('string')
   })
 
   it('should ready', async () => {
@@ -362,7 +361,6 @@ describe('workspace methods', () => {
 
   it('should echo lines', async () => {
     await workspace.echoLines(['a', 'b'])
-    await helper.wait(30)
     let ch = await nvim.call('screenchar', [79, 1])
     let s = String.fromCharCode(ch)
     expect(s).toBe('a')
@@ -529,9 +527,7 @@ describe('workspace utility', () => {
   })
 
   it('should loadFiles', async () => {
-    let files = ['a', 'b', 'c'].map(key => {
-      return URI.file(path.join(__dirname, key)).toString()
-    })
+    let files = ['a', 'b', 'c'].map(key => URI.file(path.join(__dirname, key)).toString())
     await workspace.loadFiles(files)
     for (let file of files) {
       let uri = URI.file(file).toString()
@@ -864,7 +860,7 @@ describe('workspace utility', () => {
     expect(event.regtype).toBe('V')
     expect(event.operator).toBe('y')
     expect(event.regcontents).toEqual(['foo'])
-    expect(eventCount).toEqual(3)
+    expect(eventCount).toBeGreaterThan(2)
     disposables.forEach(d => d.dispose())
   })
 
@@ -904,9 +900,7 @@ describe('workspace utility', () => {
   })
 
   it('should regist buffer expr keymap', async () => {
-    let fn = () => {
-      return '""'
-    }
+    let fn = () => '""'
     await nvim.input('i')
     let disposable = workspace.registerExprKeymap('i', '"', fn, true)
     await helper.wait(30)
@@ -1042,10 +1036,6 @@ describe('workspace events', () => {
     await helper.wait(100)
     let doc = workspace.getDocument(buf.id)
     expect(doc).toBeDefined()
-    await nvim.setLine('foo')
-    await helper.wait(30)
-    let content = doc.getDocumentContent()
-    expect(content).toMatch('foo')
   })
 })
 
@@ -1053,9 +1043,7 @@ describe('workspace textDocument content provider', () => {
 
   it('should regist document content provider', async () => {
     let provider: TextDocumentContentProvider = {
-      provideTextDocumentContent: (_uri, _token): string => {
-        return 'sample text'
-      }
+      provideTextDocumentContent: (_uri, _token): string => 'sample text'
     }
     workspace.registerTextDocumentContentProvider('test', provider)
     await helper.wait(100)
@@ -1071,9 +1059,7 @@ describe('workspace textDocument content provider', () => {
     let event = emitter.event
     let provider: TextDocumentContentProvider = {
       onDidChange: event,
-      provideTextDocumentContent: (_uri, _token): string => {
-        return text
-      }
+      provideTextDocumentContent: (_uri, _token): string => text
     }
     workspace.registerTextDocumentContentProvider('jdk', provider)
     await helper.wait(80)
@@ -1085,25 +1071,5 @@ describe('workspace textDocument content provider', () => {
     let buf = await nvim.buffer
     let lines = await buf.lines
     expect(lines).toEqual(['bar'])
-  })
-})
-
-describe('workspace private', () => {
-
-  it('should init vim events', async () => {
-    let buf = await helper.edit()
-    await buf.detach()
-    let attached = buf.isAttached
-    expect(attached).toBe(false)
-    let doc = workspace.getDocument(buf.id)
-      ; (doc as any).env.isVim = true
-      ; (workspace as any).attachChangedEvents()
-    await nvim.setLine('abc')
-    await helper.wait(300)
-    expect(doc.content).toMatch('abc')
-    await nvim.input('Adef')
-    await nvim.call('coc#_hide')
-    await helper.wait(300)
-    expect(doc.getline(0)).toMatch('abcdef')
   })
 })

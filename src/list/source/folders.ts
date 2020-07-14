@@ -1,8 +1,8 @@
 import { Neovim } from '@chemzqm/neovim'
 import path from 'path'
 import { URI } from 'vscode-uri'
+import mkdirp from 'mkdirp'
 import { ListContext, ListItem } from '../../types'
-import { mkdirp } from '../../util'
 import { statAsync } from '../../util/fs'
 import workspace from '../../workspace'
 import BasicList from '../basic'
@@ -16,14 +16,14 @@ export default class FoldList extends BasicList {
     super(nvim)
 
     this.addAction('edit', async item => {
-      let newPath = await nvim.call('input', ['Folder: ', item.label, 'file'])
+      let newPath = await nvim.call('input', ['Folder: ', item.label, 'dir'])
       let stat = await statAsync(newPath)
       if (!stat || !stat.isDirectory()) {
-        await nvim.command(`echoerr "invalid path: ${newPath}"`)
+        workspace.showMessage(`invalid path: ${newPath}`, 'error')
         return
       }
       workspace.renameWorkspaceFolder(item.label, newPath)
-    }, { reload: true, persist: true })
+    })
 
     this.addAction('delete', async item => {
       workspace.removeWorkspaceFolder(item.label)
@@ -46,8 +46,6 @@ export default class FoldList extends BasicList {
   }
 
   public async loadItems(_context: ListContext): Promise<ListItem[]> {
-    return workspace.folderPaths.map(p => {
-      return { label: p }
-    })
+    return workspace.folderPaths.map(p => ({ label: p }))
   }
 }

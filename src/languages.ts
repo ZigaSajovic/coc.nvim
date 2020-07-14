@@ -2,7 +2,6 @@ import { Neovim } from '@chemzqm/neovim'
 import { CancellationToken, CancellationTokenSource, CodeAction, CodeActionContext, CodeActionKind, CodeLens, ColorInformation, ColorPresentation, CompletionItem, CompletionItemKind, CompletionList, CompletionTriggerKind, Disposable, DocumentHighlight, DocumentLink, DocumentSelector, DocumentSymbol, FoldingRange, FormattingOptions, Hover, InsertTextFormat, Location, LocationLink, Position, Range, SelectionRange, SignatureHelp, SymbolInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver-protocol'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import commands from './commands'
-import events from './events'
 import diagnosticManager from './diagnostic/manager'
 import { CodeActionProvider, CodeLensProvider, CompletionItemProvider, DeclarationProvider, DefinitionProvider, DocumentColorProvider, DocumentFormattingEditProvider, DocumentLinkProvider, DocumentRangeFormattingEditProvider, DocumentSymbolProvider, FoldingContext, FoldingRangeProvider, HoverProvider, ImplementationProvider, OnTypeFormattingEditProvider, ReferenceContext, ReferenceProvider, RenameProvider, SelectionRangeProvider, SignatureHelpProvider, TypeDefinitionProvider, WorkspaceSymbolProvider } from './provider'
 import CodeActionManager from './provider/codeActionmanager'
@@ -28,7 +27,6 @@ import WorkspaceSymbolManager from './provider/workspaceSymbolsManager'
 import snippetManager from './snippets/manager'
 import sources from './sources'
 import { CompleteOption, CompleteResult, CompletionContext, DiagnosticCollection, Documentation, ISource, SourceType, VimCompleteItem } from './types'
-import { wait } from './util'
 import * as complete from './util/complete'
 import { getChangedFromEdits, rangeOverlap } from './util/position'
 import { byteLength, byteIndex, byteSlice } from './util/string'
@@ -45,7 +43,6 @@ interface CompleteConfig {
   defaultKindText: string
   priority: number
   echodocSupport: boolean
-  waitTime: number
   detailMaxLength: number
   detailField: string
   invalidInsertCharacters: string[]
@@ -55,16 +52,16 @@ function fixDocumentation(str: string): string {
   return str.replace(/&nbsp;/g, ' ')
 }
 
-export function check<R extends (...args: any[]) => Promise<R>>(_target: any, key: string, descriptor: any): void {
+export function check(_target: any, key: string, descriptor: any): void {
   let fn = descriptor.value
   if (typeof fn !== 'function') {
     return
   }
 
-  descriptor.value = function(...args: any[]): Promise<R> {
+  descriptor.value = function(...args: any[]): Promise<any> {
     let { cancelTokenSource } = this
     this.cancelTokenSource = new CancellationTokenSource()
-    return new Promise((resolve, reject): void => { // tslint:disable-line
+    return new Promise((resolve, reject): void => {
       let resolved = false
       let timer = setTimeout(() => {
         cancelTokenSource.cancel()
@@ -112,7 +109,7 @@ class Languages {
       let { languageId } = event.document
       let config = workspace.getConfiguration('coc.preferences', event.document.uri)
       let filetypes = config.get<string[]>('formatOnSaveFiletypes', [])
-      if (filetypes.indexOf(languageId) !== -1 || filetypes.some(item => item === '*')) {
+      if (filetypes.includes(languageId) || filetypes.some(item => item === '*')) {
         let willSaveWaitUntil = async (): Promise<TextEdit[]> => {
           let options = await workspace.getFormatOptions(event.document.uri)
           let textEdits = await this.provideDocumentFormattingEdits(event.document, options)
@@ -121,11 +118,7 @@ class Languages {
         event.waitUntil(willSaveWaitUntil())
       }
     }, null, 'languageserver')
-    workspace.ready.then(() => {
-      this.loadCompleteConfig()
-    }, _e => {
-      // noop
-    })
+    this.loadCompleteConfig()
     workspace.onDidChangeConfiguration(this.loadCompleteConfig, this)
   }
 
@@ -171,7 +164,6 @@ class Languages {
       defaultKindText: labels['default'] || '',
       priority: getConfig<number>('languageSourcePriority', 99),
       echodocSupport: getConfig<boolean>('echodocSupport', false),
-      waitTime: getConfig<number>('triggerCompletionWait', 60),
       detailField: getConfig<string>('detailField', 'menu'),
       detailMaxLength: getConfig<number>('detailMaxLength', 100),
       invalidInsertCharacters: getConfig<string[]>('invalidInsertCharacters', [' ', '(', '<', '{', '[', '\r', '\n']),
@@ -273,8 +265,11 @@ class Languages {
     return this.renameManager.register(selector, provider)
   }
 
-  public registerWorkspaceSymbolProvider(selector: DocumentSelector, provider: WorkspaceSymbolProvider): Disposable {
-    return this.workspaceSymbolsManager.register(selector, provider)
+  public registerWorkspaceSymbolProvider(provider: WorkspaceSymbolProvider): Disposable {
+    if (arguments.length > 1 && typeof arguments[1].provideWorkspaceSymbols === 'function') {
+      provider = arguments[1]
+    }
+    return this.workspaceSymbolsManager.register(provider)
   }
 
   public registerDocumentFormatProvider(selector: DocumentSelector, provider: DocumentFormattingEditProvider, priority = 0): Disposable {
@@ -429,7 +424,7 @@ class Languages {
   }
 
   @check
-  public async provideColorPresentations(color: ColorInformation, document: TextDocument, ): Promise<ColorPresentation[]> {
+  public async provideColorPresentations(color: ColorInformation, document: TextDocument,): Promise<ColorPresentation[]> {
     return await this.documentColorManager.provideColorPresentations(color, document, this.token)
   }
 
@@ -469,7 +464,7 @@ class Languages {
       case 'codeAction':
         return this.codeActionManager.hasProvider(document)
       case 'workspaceSymbols':
-        return this.workspaceSymbolsManager.hasProvider(document)
+        return this.workspaceSymbolsManager.hasProvider()
       case 'formatRange':
         return this.formatRangeManager.hasProvider(document)
       case 'hover':
@@ -523,7 +518,6 @@ class Languages {
     priority = priority == null ? this.completeConfig.priority : priority
     // index set of resolved items
     let resolvedIndexes: Set<number> = new Set()
-    let waitTime = Math.min(Math.max(50, this.completeConfig.waitTime), 300)
     let source: ISource = {
       name,
       priority,
@@ -532,17 +526,19 @@ class Languages {
       sourceType: SourceType.Service,
       filetypes: languageIds,
       triggerCharacters: triggerCharacters || [],
+      toggle: () => {
+        source.enable = !source.enable
+      },
       doComplete: async (opt: CompleteOption, token: CancellationToken): Promise<CompleteResult | null> => {
         let { triggerCharacter, bufnr } = opt
         resolvedIndexes = new Set()
-        let isTrigger = triggerCharacters && triggerCharacters.indexOf(triggerCharacter) != -1
+        let isTrigger = triggerCharacters && triggerCharacters.includes(triggerCharacter)
         let triggerKind: CompletionTriggerKind = CompletionTriggerKind.Invoked
         if (opt.triggerForInComplete) {
           triggerKind = CompletionTriggerKind.TriggerForIncompleteCompletions
         } else if (isTrigger) {
           triggerKind = CompletionTriggerKind.TriggerCharacter
         }
-        if (opt.triggerCharacter) await wait(waitTime)
         if (token.isCancellationRequested) return null
         let position = complete.getPosition(opt)
         let context: CompletionContext = { triggerKind, option: opt }
@@ -562,8 +558,10 @@ class Languages {
         let startcol = this.getStartColumn(opt.line, completeItems)
         let option: CompleteOption = Object.assign({}, opt)
         let prefix: string
-        if (startcol != null && startcol < option.col) {
-          prefix = byteSlice(opt.line, startcol, option.col)
+        if (startcol != null) {
+          if (startcol < option.col) {
+            prefix = byteSlice(opt.line, startcol, option.col)
+          }
           option.col = startcol
         }
         let items: VimCompleteItem[] = completeItems.map((o, index) => {
@@ -618,20 +616,15 @@ class Languages {
         let item = completeItems[vimItem.index]
         if (!item) return
         let line = opt.linenr - 1
-        // tslint:disable-next-line: deprecation
-        if (item.insertText && !item.textEdit) {
+        if (item.insertText != null && !item.textEdit) {
           item.textEdit = {
             range: Range.create(line, opt.col, line, opt.colnr - 1),
-            // tslint:disable-next-line: deprecation
             newText: item.insertText
           }
         }
         if (vimItem.line) Object.assign(opt, { line: vimItem.line })
         try {
           let isSnippet = await this.applyTextEdit(item, opt)
-          if (isSnippet && snippetManager.isPlainText(item.textEdit.newText)) {
-            isSnippet = false
-          }
           let { additionalTextEdits } = item
           if (additionalTextEdits && item.textEdit) {
             let r = item.textEdit.range
@@ -654,7 +647,7 @@ class Languages {
         let completeItem = completeItems[item.index]
         if (!completeItem) return false
         let commitCharacters = completeItem.commitCharacters || allCommitCharacters
-        return commitCharacters.indexOf(character) !== -1
+        return commitCharacters.includes(character)
       }
     }
     return source
@@ -672,41 +665,29 @@ class Languages {
     let { line, bufnr, linenr } = option
     let doc = workspace.getDocument(bufnr)
     if (!doc) return false
-    if (events.cursor.lnum == option.linenr + 1) {
-      // line break during completion
-      let preline = await nvim.call('getline', [option.linenr]) as string
-      let { length } = preline
-      let { range } = textEdit
-      if (length && range.start.character > length) {
-        line = line.slice(preline.length)
-        let spaceCount = 0
-        if (/^\s/.test(line)) {
-          spaceCount = line.match(/^\s+/)[0].length
-          line = line.slice(spaceCount)
-        }
-        range.start.character = range.start.character - length - spaceCount
-        range.end.character = range.end.character - length - spaceCount
-        range.start.line = range.start.line + 1
-        range.end.line = range.end.line + 1
-        linenr = linenr + 1
-      } else {
-        // can't handle
-        return false
+    let { range, newText } = textEdit
+    // handle possible indent change for textEdit
+    let oi = line.match(/^\s*/)[0]
+    let ci = doc.getline(linenr - 1).match(/^\s*/)[0]
+    if (oi != ci) {
+      let c = ci.length - oi.length
+      if (range.start.line == linenr - 1) {
+        range.start.character = range.start.character + c
+      }
+      if (range.end.line == linenr - 1) {
+        range.end.character = range.end.character + c
       }
     }
-    let { range, newText } = textEdit
     let isSnippet = item.insertTextFormat === InsertTextFormat.Snippet
     // replace inserted word
     let start = line.substr(0, range.start.character)
     let end = line.substr(range.end.character)
     if (isSnippet) {
-      await doc.applyEdits(nvim, [{
-        range: Range.create(linenr - 1, 0, linenr, 0),
-        newText: `${start}${end}\n`
-      }])
+      let currline = doc.getline(linenr - 1)
+      let endCharacter = currline.length - end.length
+      let r = Range.create(linenr - 1, range.start.character, linenr - 1, endCharacter)
       // can't select, since additionalTextEdits would break selection
-      let pos = Position.create(linenr - 1, range.start.character)
-      return await snippetManager.insertSnippet(newText, false, Range.create(pos, pos))
+      return await snippetManager.insertSnippet(newText, false, r)
     }
     let newLines = `${start}${newText}${end}`.split('\n')
     if (newLines.length == 1) {
@@ -733,12 +714,12 @@ class Languages {
     if (!textEdits || textEdits.length == 0) return
     let document = workspace.getDocument(bufnr)
     if (!document) return
-    await (document as any)._fetchContent()
-    // how to move cursor after edit
+    await document.patchChange(true)
+    // move cursor after edit
     let changed = null
     let pos = await workspace.getCursorPosition()
     if (!snippet) changed = getChangedFromEdits(pos, textEdits)
-    await document.applyEdits(this.nvim, textEdits)
+    await document.applyEdits(textEdits)
     if (changed) await workspace.moveTo(Position.create(pos.line + changed.line, pos.character + changed.character))
   }
 
@@ -800,7 +781,7 @@ class Languages {
     } else {
       obj.info = ''
     }
-    if (!obj.word) obj.empty = 1
+    if (obj.word == '') obj.empty = 1
     if (item.textEdit) obj.line = opt.line
     if (item.kind == CompletionItemKind.Folder && !obj.abbr.endsWith('/')) {
       obj.abbr = obj.abbr + '/'
@@ -808,7 +789,7 @@ class Languages {
     if (echodocSupport && item.kind >= 2 && item.kind <= 4) {
       let fields = [item.detail || '', obj.abbr, obj.word]
       for (let s of fields) {
-        if (s.indexOf('(') !== -1) {
+        if (s.includes('(')) {
           obj.signature = s
           break
         }

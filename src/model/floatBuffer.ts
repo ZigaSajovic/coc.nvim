@@ -1,10 +1,15 @@
-import { Buffer, Neovim, Window } from '@chemzqm/neovim'
-import { Highlight, getHiglights } from '../util/highlight'
-import { characterIndex, byteLength } from '../util/string'
-import { group } from '../util/array'
+import { Neovim } from '@chemzqm/neovim'
 import { Documentation, Fragment } from '../types'
+import { group } from '../util/array'
+import { getHiglights, Highlight, diagnosticFiletypes } from '../util/highlight'
+import { byteLength, characterIndex } from '../util/string'
 import workspace from '../workspace'
 const logger = require('../util/logger')('model-floatBuffer')
+
+export interface Dimension {
+  width: number
+  height: number
+}
 
 export default class FloatBuffer {
   private lines: string[] = []
@@ -12,106 +17,27 @@ export default class FloatBuffer {
   private positions: [number, number, number?][] = []
   private enableHighlight = true
   private highlightTimeout = 500
-  private tabstop = 2
-  public width = 0
-  constructor(
-    private nvim: Neovim,
-    public buffer: Buffer,
-    private window?: Window
-  ) {
+  private filetype: string
+  constructor(private nvim: Neovim) {
     let config = workspace.getConfiguration('coc.preferences')
     this.enableHighlight = config.get<boolean>('enableFloatHighlight', true)
     this.highlightTimeout = config.get<number>('highlightTimeout', 500)
-    buffer.getOption('tabstop').then(val => {
-      this.tabstop = val as number
-    }, _e => {
-      // noop
-    })
   }
 
-  public getHeight(docs: Documentation[], maxWidth: number): number {
-    let l = 0
-    for (let doc of docs) {
-      let lines = doc.content.split(/\r?\n/)
-      if (doc.filetype == 'markdown') {
-        lines = lines.filter(s => !s.startsWith('```'))
-      }
-      for (let line of lines) {
-        l = l + Math.max(1, Math.ceil(byteLength(line) / (maxWidth - 4)))
-      }
+  public async setDocuments(docs: Documentation[], width: number): Promise<void> {
+    let fragments = this.calculateFragments(docs, width)
+    let { filetype } = docs[0]
+    if (!diagnosticFiletypes.includes(filetype)) {
+      this.filetype = filetype
     }
-    return l + docs.length - 1
-  }
-
-  public get valid(): Promise<boolean> {
-    return this.buffer.valid
-  }
-
-  public calculateFragments(docs: Documentation[], maxWidth: number): Fragment[] {
-    let fragments: Fragment[] = []
-    let idx = 0
-    let currLine = 0
-    let newLines: string[] = []
-    let fill = false
-    let positions = this.positions = []
-    for (let doc of docs) {
-      let lines: string[] = []
-      let content = doc.content.replace(/\s+$/, '')
-      let arr = content.split(/\r?\n/)
-      if (['Error', 'Info', 'Warning', 'Hint'].indexOf(doc.filetype) !== -1) {
-        fill = true
-      }
-      // let [start, end] = doc.active || []
-      for (let str of arr) {
-        lines.push(str)
-        if (doc.active) {
-          let part = str.slice(doc.active[0], doc.active[1])
-          positions.push([currLine + 1, doc.active[0] + 1, byteLength(part)])
-        }
-      }
-      fragments.push({
-        start: currLine,
-        lines,
-        filetype: doc.filetype
-      })
-      newLines.push(...lines.filter(s => !/^\s*```/.test(s)))
-      if (idx != docs.length - 1) {
-        newLines.push('—')
-        currLine = newLines.length
-      }
-      idx = idx + 1
-    }
-    let width = this.width = Math.min(Math.max(...newLines.map(s => this.getWidth(s))) + 2, maxWidth)
-    this.lines = newLines.map(s => {
-      if (s == '—') return '—'.repeat(width - 2)
-      return s
-    })
-    return fragments
-  }
-
-  private getWidth(line: string): number {
-    let { tabstop } = this
-    line = line.replace(/\t/g, ' '.repeat(tabstop))
-    return byteLength(line)
-  }
-
-  public async setDocuments(docs: Documentation[], maxWidth: number): Promise<void> {
-    let fragments = this.calculateFragments(docs, maxWidth)
-    let filetype = await this.nvim.eval('&filetype') as string
     if (workspace.isNvim) {
       fragments = fragments.reduce((p, c) => {
-        p.push(...this.splitFragment(c, filetype))
+        p.push(...this.splitFragment(c, 'sh'))
         return p
       }, [])
     }
     if (this.enableHighlight) {
-      let arr = await Promise.all(fragments.map(f => {
-        return getHiglights(f.lines, f.filetype, this.highlightTimeout).then(highlights => {
-          return highlights.map(highlight => {
-            return Object.assign({}, highlight, { line: highlight.line + f.start })
-          })
-        })
-      }))
+      let arr = await Promise.all(fragments.map(f => getHiglights(f.lines, f.filetype, this.highlightTimeout).then(highlights => highlights.map(highlight => Object.assign({}, highlight, { line: highlight.line + f.start })))))
       this.highlights = arr.reduce((p, c) => p.concat(c), [])
     } else {
       this.highlights = []
@@ -128,7 +54,7 @@ export default class FloatBuffer {
       let ms = line.match(/^\s*```\s*(\w+)?/)
       if (ms != null) {
         if (lines.length) {
-          res.push({ lines, filetype: this.fixFiletype(filetype), start: curr - lines.length })
+          res.push({ lines, filetype: fixFiletype(filetype), start: curr - lines.length })
           lines = []
         }
         inBlock = !inBlock
@@ -139,41 +65,49 @@ export default class FloatBuffer {
       }
     }
     if (lines.length) {
-      res.push({ lines, filetype: this.fixFiletype(filetype), start: curr - lines.length })
+      res.push({ lines, filetype: fixFiletype(filetype), start: curr - lines.length })
       lines = []
     }
     return res
   }
 
-  private fixFiletype(filetype: string): string {
-    if (filetype == 'ts') return 'typescript'
-    if (filetype == 'js') return 'javascript'
-    if (filetype == 'bash') return 'sh'
-    return filetype
-  }
-
-  public setLines(): void {
-    let { buffer, lines, nvim, highlights } = this
-    nvim.call('clearmatches', this.window ? [this.window.id] : [], true)
-    buffer.clearNamespace(-1, 0, -1)
-    buffer.setLines(lines, { start: 0, end: -1, strictIndexing: false }, true)
-    if (highlights.length) {
+  public setLines(bufnr: number, winid?: number): void {
+    let { lines, nvim, highlights } = this
+    let buffer = nvim.createBuffer(bufnr)
+    nvim.call('clearmatches', winid ? [winid] : [], true)
+    // vim will clear text properties
+    if (workspace.isNvim) buffer.clearNamespace(-1, 0, -1)
+    if (workspace.isNvim) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      buffer.setLines(lines, { start: 0, end: -1, strictIndexing: false }, true)
+    } else {
+      nvim.call('coc#util#set_buf_lines', [bufnr, lines], true)
+    }
+    if (highlights && highlights.length) {
       let positions: [number, number, number?][] = []
       for (let highlight of highlights) {
+        if (highlight.hlGroup == 'htmlBold') {
+          highlight.hlGroup = 'CocBold'
+        }
         buffer.addHighlight({
           srcId: workspace.createNameSpace('coc-float'),
           ...highlight
-        }).catch(_e => {
-          // noop
-        })
+        }).logError()
         if (highlight.isMarkdown) {
           let line = lines[highlight.line]
           if (line) {
-            let before = line[characterIndex(line, highlight.colStart)]
-            let after = line[characterIndex(line, highlight.colEnd) - 1]
-            if (before == after && ['_', '`', '*'].indexOf(before) !== -1) {
-              positions.push([highlight.line + 1, highlight.colStart + 1])
-              positions.push([highlight.line + 1, highlight.colEnd])
+            let si = characterIndex(line, highlight.colStart)
+            let ei = characterIndex(line, highlight.colEnd) - 1
+            let before = line[si]
+            let after = line[ei]
+            if (before == after && ['_', '`', '*'].includes(before)) {
+              if (before == '_' && line[si + 1] == '_' && line[ei - 1] == '_' && si + 1 < ei - 1) {
+                positions.push([highlight.line + 1, highlight.colStart + 1, 2])
+                positions.push([highlight.line + 1, highlight.colEnd - 1, 2])
+              } else {
+                positions.push([highlight.line + 1, highlight.colStart + 1])
+                positions.push([highlight.line + 1, highlight.colEnd])
+              }
             }
             if (highlight.colEnd - highlight.colStart == 2 && before == '\\') {
               positions.push([highlight.line + 1, highlight.colStart + 1])
@@ -182,8 +116,8 @@ export default class FloatBuffer {
         }
       }
       for (let arr of group(positions, 8)) {
-        if (this.window) {
-          nvim.call('win_execute', [this.window.id, `call matchaddpos('Conceal', ${JSON.stringify(arr)},11)`], true)
+        if (winid) {
+          nvim.call('win_execute', [winid, `call matchaddpos('Conceal', ${JSON.stringify(arr)},11)`], true)
         } else {
           nvim.call('matchaddpos', ['Conceal', arr, 11], true)
         }
@@ -192,12 +126,84 @@ export default class FloatBuffer {
     for (let arr of group(this.positions || [], 8)) {
       arr = arr.filter(o => o[2] != 0)
       if (arr.length) {
-        if (this.window) {
-          nvim.call('win_execute', [this.window.id, `call matchaddpos('CocUnderline', ${JSON.stringify(arr)},12)`], true)
+        if (winid) {
+          nvim.call('win_execute', [winid, `call matchaddpos('CocUnderline', ${JSON.stringify(arr)},12)`], true)
         } else {
           nvim.call('matchaddpos', ['CocUnderline', arr, 12], true)
         }
       }
     }
+    if (winid && this.enableHighlight && this.filetype) {
+      nvim.call('win_execute', [winid, `runtime! syntax/${this.filetype}.vim`], true)
+    }
   }
+
+  private calculateFragments(docs: Documentation[], width: number): Fragment[] {
+    let fragments: Fragment[] = []
+    let idx = 0
+    let currLine = 0
+    let newLines: string[] = []
+    let positions = this.positions = []
+    for (let doc of docs) {
+      let lines: string[] = []
+      let arr = doc.content.split(/\r?\n/)
+      for (let str of arr) {
+        if (doc.filetype == 'markdown') {
+          // replace `\` surrounded by `__` because bug of markdown highlight in vim.
+          str = str.replace(/__(.+?)__/g, (_, p1) => {
+            return `__${p1.replace(/\\_/g, '_').replace(/\\\\/g, '\\')}__`
+          })
+        }
+        lines.push(str)
+        if (doc.active) {
+          let part = str.slice(doc.active[0], doc.active[1])
+          positions.push([currLine + 1, doc.active[0] + 1, byteLength(part)])
+        }
+      }
+      fragments.push({
+        start: currLine,
+        lines,
+        filetype: doc.filetype
+      })
+      let filtered = doc.filetype == 'markdown' ? lines.filter(s => !/^\s*```/.test(s)) : lines
+      newLines.push(...filtered)
+      if (idx != docs.length - 1) {
+        newLines.push('—'.repeat(width - 2))
+        currLine = newLines.length
+      }
+      idx = idx + 1
+    }
+    this.lines = newLines
+    return fragments
+  }
+
+  public static getDimension(docs: Documentation[], maxWidth: number, maxHeight: number): Dimension {
+    // width contains padding
+    if (maxWidth <= 2 || maxHeight == 0) return { width: 0, height: 0 }
+    let arr: number[] = []
+    for (let doc of docs) {
+      let lines = doc.content.split(/\r?\n/)
+      for (let line of lines) {
+        if (doc.filetype == 'markdown'
+          && /^\s*```/.test(line)) {
+          continue
+        }
+        arr.push(byteLength(line.replace(/\t/g, '  ')) + 2)
+      }
+    }
+    let width = Math.min(Math.max(...arr), maxWidth)
+    if (width <= 2) return { width: 0, height: 0 }
+    let height = docs.length - 1
+    for (let w of arr) {
+      height = height + Math.max(Math.ceil((w - 2) / (width - 2)), 1)
+    }
+    return { width, height: Math.min(height, maxHeight) }
+  }
+}
+
+function fixFiletype(filetype: string): string {
+  if (filetype == 'ts') return 'typescript'
+  if (filetype == 'js') return 'javascript'
+  if (filetype == 'bash') return 'sh'
+  return filetype
 }

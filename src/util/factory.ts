@@ -7,8 +7,8 @@ import { defaults } from './lodash'
 const createLogger = require('./logger')
 const logger = createLogger('util-factoroy')
 
-declare var __webpack_require__: any
-declare var __non_webpack_require__: any
+declare let __webpack_require__: any
+declare let __non_webpack_require__: any
 const requireFunc = typeof __webpack_require__ === "function" ? __non_webpack_require__ : require
 
 export interface ExtensionExport {
@@ -28,7 +28,6 @@ export interface IModule {
 }
 
 const Module: IModule = require('module')
-
 const REMOVED_GLOBALS = [
   'reallyExit',
   'abort',
@@ -86,6 +85,7 @@ export interface ISandbox {
   console: { [key in keyof Console]?: Function }
   Buffer: any
   Reflect: any
+  // eslint-disable-next-line id-blacklist
   String: any
   Promise: any
 }
@@ -137,7 +137,6 @@ function createSandbox(filename: string, logger: Logger): ISandbox {
   REMOVED_GLOBALS.forEach(name => {
     sandbox.process[name] = removedGlobalStub(name)
   })
-  // tslint:disable-next-line: no-empty
   sandbox.process['chdir'] = () => { }
 
   // read-only umask
@@ -152,12 +151,12 @@ function createSandbox(filename: string, logger: Logger): ISandbox {
 }
 
 // inspiration drawn from Module
-export function createExtension(id: string, filename: string): ExtensionExport {
-  if (!fs.existsSync(filename)) {
-    // tslint:disable-next-line:no-empty
-    return { activate: () => { }, deactivate: null }
+export function createExtension(id: string, filename: string, isEmpty = false): ExtensionExport {
+  if (isEmpty || !fs.existsSync(filename)) return {
+    activate: () => { },
+    deactivate: null
   }
-  const sandbox = createSandbox(filename, createLogger(`extension-${id}`))
+  const sandbox = createSandbox(filename, createLogger(`extension:${id}`))
 
   delete Module._cache[requireFunc.resolve(filename)]
 
@@ -167,7 +166,6 @@ export function createExtension(id: string, filename: string): ExtensionExport {
   const activate = (defaultImport && defaultImport.activate) || defaultImport
 
   if (typeof activate !== 'function') {
-    // tslint:disable-next-line:no-empty
     return { activate: () => { }, deactivate: null }
   }
   return {

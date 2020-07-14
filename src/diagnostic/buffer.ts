@@ -1,94 +1,65 @@
 import { NeovimClient as Neovim } from '@chemzqm/neovim'
-import { Diagnostic, DiagnosticSeverity, Emitter, Event, Range, Disposable } from 'vscode-languageserver-protocol'
+import debounce from 'debounce'
+import { Diagnostic, DiagnosticSeverity, Emitter, Event, Range } from 'vscode-languageserver-protocol'
 import Document from '../model/document'
-import { LocationListItem } from '../types'
-import CallSequence from '../util/callSequence'
-import { equals } from '../util/object'
-import { byteIndex, byteLength } from '../util/string'
 import workspace from '../workspace'
 import { DiagnosticConfig } from './manager'
-import { getLocationListItem, getNameFromSeverity } from './util'
+import { getNameFromSeverity } from './util'
 const logger = require('../util/logger')('diagnostic-buffer')
 const severityNames = ['CocError', 'CocWarning', 'CocInfo', 'CocHint']
 
 // maintains sign and highlightId
-export class DiagnosticBuffer implements Disposable {
+export class DiagnosticBuffer {
   private readonly srdId: number
   private readonly signIds: Set<number> = new Set()
-  private sequence: CallSequence = null
   private readonly _onDidRefresh = new Emitter<void>()
   public readonly matchIds: Set<number> = new Set()
-  public diagnostics: ReadonlyArray<Diagnostic> = []
   public readonly onDidRefresh: Event<void> = this._onDidRefresh.event
-  public readonly bufnr: number
-  public readonly refresh: (diagnosticItems: ReadonlyArray<Diagnostic>) => void
+  /**
+   * Refresh diagnostics with debounce
+   */
+  public refresh: Function & { clear(): void }
 
-  constructor(bufnr: number, private config: DiagnosticConfig) {
-    this.bufnr = bufnr
+  constructor(
+    public readonly bufnr: number,
+    public readonly uri: string,
+    private config: DiagnosticConfig) {
     this.srdId = workspace.createNameSpace('coc-diagnostic')
-    let timer: NodeJS.Timer = null
-    let time = Date.now()
-    this.refresh = (diagnostics: ReadonlyArray<Diagnostic>) => {
-      time = Date.now()
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(async () => {
-        let current = time
-        if (this.sequence) {
-          await this.sequence.cancel()
-        }
-        // staled
-        if (current != time || !this.document) return
-        diagnostics.forEach(o => {
-          o.range = this.fixRange(o.range)
-        })
-        this._refresh(diagnostics)
-      }, 30)
-    }
+    this.refresh = debounce((diagnostics: Diagnostic[]) => {
+      this._refresh(diagnostics).logError()
+    }, 300)
   }
 
-  private _refresh(diagnostics: ReadonlyArray<Diagnostic>): void {
-    if (equals(this.diagnostics, diagnostics)) return
+  /**
+   * Refresh diagnostics without debounce
+   */
+  public forceRefresh(diagnostics: ReadonlyArray<Diagnostic>): void {
+    this.refresh.clear()
+    this._refresh(diagnostics).logError()
+  }
+
+  private async _refresh(diagnostics: ReadonlyArray<Diagnostic>): Promise<void> {
+    let { refreshOnInsertMode } = this.config
     let { nvim } = this
-    let sequence = this.sequence = new CallSequence()
-    let winid: number
-    let bufnr: number
-    sequence.addFunction(async () => {
-      let arr = await nvim.eval(`[coc#util#valid_state(), bufwinid(${this.bufnr}), bufnr("%")]`) as [number, number, number]
-      if (arr[0] == 0 || !this.document) return true
-      winid = arr[1]
-      bufnr = arr[2]
-    })
-    sequence.addFunction(async () => {
-      nvim.pauseNotification()
-      this.setDiagnosticInfo(bufnr, diagnostics)
-      this.addSigns(diagnostics)
-      this.setLocationlist(diagnostics, winid)
-      this.addHighlight(diagnostics, winid)
-      this.addDiagnosticVText(diagnostics)
-      let res = await this.nvim.resumeNotification()
-      if (Array.isArray(res) && res[1]) logger.error('Diagnostic error:', res[1])
-    })
-    sequence.start().then(async canceled => {
-      if (!canceled) {
-        this.diagnostics = diagnostics
-        this._onDidRefresh.fire(void 0)
-      }
-    }, e => {
-      logger.error(e)
-    })
-  }
-
-  public setLocationlist(diagnostics: ReadonlyArray<Diagnostic>, winid: number): void {
-    if (!this.config.locationlist) return
-    let { nvim, bufnr } = this
-    // not shown
-    if (winid == -1) return
-    let items: LocationListItem[] = []
-    for (let diagnostic of diagnostics) {
-      let item = getLocationListItem(diagnostic.source, bufnr, diagnostic)
-      items.push(item)
+    let arr = await nvim.eval(`[coc#util#check_refresh(${this.bufnr}),mode(),bufnr("%"), line(".")]`) as [number, string, number, number]
+    if (arr[0] == 0) return
+    let mode = arr[1]
+    if (!refreshOnInsertMode && mode.startsWith('i') && diagnostics.length) return
+    let bufnr = arr[2]
+    let lnum = arr[3]
+    nvim.pauseNotification()
+    this.setDiagnosticInfo(diagnostics)
+    this.addSigns(diagnostics)
+    this.addHighlight(diagnostics, bufnr)
+    if (this.bufnr == bufnr) {
+      this.showVirtualText(diagnostics, lnum)
     }
-    nvim.call('setloclist', [winid, [], ' ', { title: 'Diagnostics of coc', items }], true)
+    if (workspace.isVim) {
+      this.nvim.command('redraw', true)
+    }
+    let res = await this.nvim.resumeNotification()
+    if (Array.isArray(res) && res[1]) throw new Error(res[1])
+    this._onDidRefresh.fire(void 0)
   }
 
   private clearSigns(): void {
@@ -109,7 +80,7 @@ export class DiagnosticBuffer implements Disposable {
         let ms = line.match(/^\s*line=\d+\s+id=(\d+)\s+name=(\w+)/)
         if (!ms) continue
         let [, id, name] = ms
-        if (!signIds.has(Number(id)) && severityNames.indexOf(name) != -1) {
+        if (!signIds.has(Number(id)) && severityNames.includes(name)) {
           ids.push(id)
         }
       }
@@ -124,7 +95,6 @@ export class DiagnosticBuffer implements Disposable {
     this.clearSigns()
     let { nvim, bufnr, signIds } = this
     let signId = this.config.signOffset
-    signIds.clear()
     let lines: Set<number> = new Set()
     for (let diagnostic of diagnostics) {
       let { range, severity } = diagnostic
@@ -138,7 +108,7 @@ export class DiagnosticBuffer implements Disposable {
     }
   }
 
-  public setDiagnosticInfo(bufnr: number, diagnostics: ReadonlyArray<Diagnostic>): void {
+  public setDiagnosticInfo(diagnostics: ReadonlyArray<Diagnostic>): void {
     let lnums = [0, 0, 0, 0]
     let info = { error: 0, warning: 0, information: 0, hint: 0, lnums }
     for (let diagnostic of diagnostics) {
@@ -161,46 +131,50 @@ export class DiagnosticBuffer implements Disposable {
       }
     }
     this.nvim.call('coc#util#set_buf_var', [this.bufnr, 'coc_diagnostic_info', info], true)
-    if (bufnr == this.bufnr) {
-      this.nvim.call('coc#util#do_autocmd', ['CocDiagnosticChange'], true)
-    }
+    this.nvim.call('coc#util#do_autocmd', ['CocDiagnosticChange'], true)
   }
 
-  private addDiagnosticVText(diagnostics: ReadonlyArray<Diagnostic>): void {
-    let { bufnr, nvim } = this
-    if (!this.config.virtualText) return
-    if (!nvim.hasFunction('nvim_buf_set_virtual_text')) return
+  public showVirtualText(diagnostics: ReadonlyArray<Diagnostic>, lnum: number): void {
+    let { bufnr, config } = this
+    if (!config.virtualText) return
     let buffer = this.nvim.createBuffer(bufnr)
-    let lines: Set<number> = new Set()
     let srcId = this.config.virtualTextSrcId
     let prefix = this.config.virtualTextPrefix
+    if (this.config.virtualTextCurrentLineOnly) {
+      diagnostics = diagnostics.filter(d => {
+        let { start, end } = d.range
+        return start.line <= lnum - 1 && end.line >= lnum - 1
+      })
+    }
     buffer.clearNamespace(srcId)
     for (let diagnostic of diagnostics) {
       let { line } = diagnostic.range.start
-      if (lines.has(line)) continue
-      lines.add(line)
       let highlight = getNameFromSeverity(diagnostic.severity) + 'VirtualText'
-      let msg =
-        diagnostic.message.split(/\n/)
-          .map((l: string) => l.trim())
-          .filter((l: string) => l.length > 0)
-          .slice(0, this.config.virtualTextLines)
-          .join(this.config.virtualTextLineSeparator)
+      let msg = diagnostic.message.split(/\n/)
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0)
+        .slice(0, this.config.virtualTextLines)
+        .join(this.config.virtualTextLineSeparator)
       buffer.setVirtualText(srcId, line, [[prefix + msg, highlight]], {}).logError()
     }
   }
 
   public clearHighlight(): void {
-    let { matchIds } = this
-    if (!this.document) return
-    this.document.clearMatchIds(matchIds)
+    let { matchIds, document } = this
+    if (document) {
+      document.clearMatchIds(matchIds)
+    }
     this.matchIds.clear()
   }
 
-  public addHighlight(diagnostics: ReadonlyArray<Diagnostic>, winid): void {
+  public addHighlight(diagnostics: ReadonlyArray<Diagnostic>, bufnr: number): void {
     this.clearHighlight()
     if (diagnostics.length == 0) return
-    if (winid == -1 && workspace.isVim && !workspace.env.textprop) return
+    // can't add highlight for old vim
+    if (workspace.isVim && !workspace.env.textprop && bufnr != this.bufnr) return
+    let { document } = this
+    if (!document) return
+    // TODO support DiagnosticTag
     const highlights: Map<string, Range[]> = new Map()
     for (let diagnostic of diagnostics) {
       let { range, severity } = diagnostic
@@ -210,19 +184,9 @@ export class DiagnosticBuffer implements Disposable {
       highlights.set(hlGroup, ranges)
     }
     for (let [hlGroup, ranges] of highlights.entries()) {
-      let matchIds = this.document.highlightRanges(ranges, hlGroup, this.srdId)
+      let matchIds = document.highlightRanges(ranges, hlGroup, this.srdId)
       for (let id of matchIds) this.matchIds.add(id)
     }
-  }
-
-  // fix range out of total characters
-  private fixRange(range: Range): Range {
-    let { start, end } = range
-    if (start.line != end.line) return range
-    let line = this.document.getline(start.line)
-    if (!line) return range
-    if (start.character < line.length) return range
-    return Range.create(start.line, line.length - 1, start.line, line.length)
   }
 
   /**
@@ -232,35 +196,30 @@ export class DiagnosticBuffer implements Disposable {
    * @returns {Promise<void>}
    */
   public async clear(): Promise<void> {
-    if (this.sequence) this.sequence.cancel().logError()
+    this.refresh.clear()
     let { nvim } = this
     nvim.pauseNotification()
     this.clearHighlight()
     this.clearSigns()
-    if (this.config.virtualText
-      && nvim.hasFunction('nvim_buf_set_virtual_text')
-      && this.document) {
-      this.document.buffer.clearNamespace(this.config.virtualTextSrcId)
+    if (this.config.virtualText) {
+      let buffer = nvim.createBuffer(this.bufnr)
+      buffer.clearNamespace(this.config.virtualTextSrcId)
     }
-    this.setDiagnosticInfo(workspace.bufnr, [])
+    this.setDiagnosticInfo([])
     await nvim.resumeNotification(false, true)
   }
 
+  public hasHighlights(): boolean {
+    return this.matchIds.size > 0
+  }
+
   public dispose(): void {
-    if (this.sequence) {
-      this.sequence.cancel().logError()
-    }
+    this.refresh.clear()
     this._onDidRefresh.dispose()
   }
 
   private get document(): Document | null {
-    if (!this.bufnr) return null
-    return workspace.getDocument(this.bufnr)
-  }
-
-  public get uri(): string | null {
-    if (!this.document) return null
-    return this.document.uri
+    return workspace.getDocument(this.uri)
   }
 
   private get nvim(): Neovim {

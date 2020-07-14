@@ -203,13 +203,15 @@ export default class Refactor {
       let pos = hlRanges[0].start
       nvim.call('coc#util#jumpTo', [pos.line, pos.character], true)
     }
+    if (workspace.isVim) {
+      nvim.command('redraw', true)
+    }
     let [, err] = await nvim.resumeNotification()
     if (err) {
       logger.error(err)
       return
     }
-    await (document as any)._fetchContent()
-    document.forceSync()
+    await document.patchChange()
     await commands.executeCommand('editor.action.addRanges', hlRanges)
   }
 
@@ -320,10 +322,7 @@ export default class Refactor {
     let doc = this.document
     if (!doc) return
     let { buffer } = doc
-    if (workspace.isVim) {
-      await (doc as any)._fetchContent()
-    }
-    doc.forceSync()
+    await doc.patchChange()
     let changes = await this.getFileChanges()
     if (!changes) return
     changes.sort((a, b) => a.lnum - b.lnum)
@@ -526,7 +525,7 @@ export default class Refactor {
     let lineChange = lines.length - (range.end.line - range.start.line) - 1
     if (lineChange == 0) return
     let lineChanges: LineChange[] = []
-    if (text.indexOf('\u3000') !== -1) {
+    if (text.includes('\u3000')) {
       let startLine = range.start.line
       let diffs = fastDiff(original, text)
       let offset = 0

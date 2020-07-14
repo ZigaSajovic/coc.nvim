@@ -3,7 +3,6 @@ import { FormattingOptions } from 'jsonc-parser'
 import { Emitter, Event, Range, TextDocumentContentChangeEvent, TextEdit } from 'vscode-languageserver-protocol'
 import completion from '../completion'
 import Document from '../model/document'
-import { wait } from '../util'
 import { comparePosition, positionInRange, rangeInRange } from '../util/position'
 import { byteLength } from '../util/string'
 import workspace from '../workspace'
@@ -15,7 +14,7 @@ export class SnippetSession {
   private _isActive = false
   private _currId = 0
   // Get state of line where we inserted
-  private version = 0
+  private applying = false
   private preferComplete = false
   private _snippet: CocSnippet = null
   private _onCancelEvent = new Emitter<void>()
@@ -28,8 +27,8 @@ export class SnippetSession {
   }
 
   public async start(snippetString: string, select = true, range?: Range): Promise<boolean> {
-    const { document, nvim } = this
-    if (!document) return false
+    const { document } = this
+    if (!document || !document.attached) return false
     if (!range) {
       let position = await workspace.getCursorPosition()
       range = Range.create(position, position)
@@ -49,19 +48,12 @@ export class SnippetSession {
       edit.newText = edit.newText + currentIndent
       inserted = inserted + currentIndent
     }
-    if (snippet.isPlainText) {
-      // insert as text
-      await document.applyEdits(nvim, [edit])
-      let placeholder = snippet.finalPlaceholder
-      await workspace.moveTo(placeholder.range.start)
-      return this._isActive
-    }
     await document.patchChange()
-    document.forceSync()
-    this.version = document.version
-    await document.applyEdits(nvim, [edit])
+    this.applying = true
+    await document.applyEdits([edit])
+    this.applying = false
     if (this._isActive) {
-      // insert check
+      // find valid placeholder
       let placeholder = this.findPlaceholder(range)
       // insert to placeholder
       if (placeholder && !placeholder.isFinalTabstop) {
@@ -72,6 +64,12 @@ export class SnippetSession {
         if (select) await this.selectPlaceholder(p)
         return true
       }
+    }
+    if (snippet.isPlainText) {
+      this.deactivate()
+      let placeholder = snippet.finalPlaceholder
+      await workspace.moveTo(placeholder.range.start)
+      return false
     }
     // new snippet
     this._snippet = snippet
@@ -103,23 +101,23 @@ export class SnippetSession {
   }
 
   public async nextPlaceholder(): Promise<void> {
-    await this.documentSynchronize()
     if (!this.isActive) return
+    await this.document.patchChange()
     let curr = this.placeholder
     let next = this.snippet.getNextPlaceholder(curr.index)
     await this.selectPlaceholder(next)
   }
 
   public async previousPlaceholder(): Promise<void> {
-    await this.documentSynchronize()
     if (!this.isActive) return
+    await this.document.patchChange()
     let curr = this.placeholder
     let prev = this.snippet.getPrevPlaceholder(curr.index)
     await this.selectPlaceholder(prev)
   }
 
   public async synchronizeUpdatedPlaceholders(change: TextDocumentContentChangeEvent): Promise<void> {
-    if (!this.isActive || !this.document || this.document.version - this.version == 1) return
+    if (!this.isActive || !this.document || this.applying) return
     let edit: TextEdit = { range: (change as any).range, newText: change.text }
     let { snippet } = this
     // change outside range
@@ -137,7 +135,7 @@ export class SnippetSession {
       this.deactivate()
       return
     }
-    if (placeholder.isFinalTabstop) {
+    if (placeholder.isFinalTabstop && snippet.finalCount <= 1) {
       logger.info('Change final placeholder, cancelling snippet session')
       this.deactivate()
       return
@@ -145,9 +143,9 @@ export class SnippetSession {
     this._currId = placeholder.id
     let { edits, delta } = snippet.updatePlaceholder(placeholder, edit)
     if (!edits.length) return
-    this.version = this.document.version
-    // let pos = await workspace.getCursorPosition()
-    await this.document.applyEdits(this.nvim, edits)
+    this.applying = true
+    await this.document.applyEdits(edits)
+    this.applying = false
     if (delta) {
       await this.nvim.call('coc#util#move_cursor', delta)
     }
@@ -167,12 +165,14 @@ export class SnippetSession {
     this._currId = placeholder.id
     if (placeholder.choice) {
       await nvim.call('coc#snippet#show_choices', [start.line + 1, col, len, placeholder.choice])
+      if (triggerAutocmd) nvim.call('coc#util#do_autocmd', ['CocJumpPlaceholder'], true)
     } else {
-      await this.select(placeholder.range, placeholder.value, triggerAutocmd)
+      await this.select(placeholder, triggerAutocmd)
     }
   }
 
-  private async select(range: Range, text: string, triggerAutocmd = true): Promise<void> {
+  private async select(placeholder: CocSnippetPlaceholder, triggerAutocmd = true): Promise<void> {
+    let { range, value, isFinalTabstop } = placeholder
     let { document, nvim } = this
     let { start, end } = range
     let { textDocument } = document
@@ -182,7 +182,7 @@ export class SnippetSession {
     let endLine = document.getline(end.line)
     let endCol = endLine ? byteLength(endLine.slice(0, end.character)) : 0
     nvim.setVar('coc_last_placeholder', {
-      current_text: text,
+      current_text: value,
       start: { line: start.line, col },
       end: { line: end.line, col: endCol }
     }, true)
@@ -193,7 +193,7 @@ export class SnippetSession {
       await nvim.eval(`feedkeys("${pre}\\<C-y>", 'in')`)
       return
     }
-    let resetVirtualEdit = false
+    // create move cmd
     if (mode != 'n') move_cmd += "\\<Esc>"
     if (len == 0) {
       if (col == 0 || (!mode.startsWith('i') && col < byteLength(line))) {
@@ -218,29 +218,32 @@ export class SnippetSession {
       col = await this.getVirtualCol(start.line + 1, col)
       move_cmd += `o${start.line + 1}G${col + 1}|o\\<c-g>`
     }
-    nvim.pauseNotification()
-    if (ve != 'onemore') {
-      resetVirtualEdit = true
-      nvim.setOption('virtualedit', 'onemore', true)
+    if (mode == 'i' && move_cmd == "\\<Esc>a") {
+      move_cmd = ''
     }
-    nvim.command(`noa call cursor(${start.line + 1},${col + (move_cmd == 'a' ? 0 : 1)})`, true)
-    nvim.call('eval', [`feedkeys("${move_cmd}", 'in')`], true)
-    if (resetVirtualEdit) nvim.setOption('virtualedit', ve, true)
+    nvim.pauseNotification()
+    nvim.setOption('virtualedit', 'onemore', true)
+    nvim.call('cursor', [start.line + 1, col + (move_cmd == 'a' ? 0 : 1)], true)
+    if (move_cmd) {
+      nvim.call('eval', [`feedkeys("${move_cmd}", 'in')`], true)
+    }
+    nvim.setOption('virtualedit', ve, true)
+    if (isFinalTabstop) {
+      if (this.snippet.finalCount == 1) {
+        logger.info('Jump to final placeholder, cancelling snippet session')
+        this.deactivate()
+      } else {
+        nvim.call('coc#snippet#disable', [], true)
+      }
+    }
     if (workspace.env.isVim) nvim.command('redraw', true)
     await nvim.resumeNotification()
-    if (triggerAutocmd) nvim.command('silent doautocmd User CocJumpPlaceholder', true)
+    if (triggerAutocmd) nvim.call('coc#util#do_autocmd', ['CocJumpPlaceholder'], true)
   }
 
   private async getVirtualCol(line: number, col: number): Promise<number> {
     let { nvim } = this
     return await nvim.eval(`virtcol([${line}, ${col}])`) as number
-  }
-
-  private async documentSynchronize(): Promise<void> {
-    if (!this.isActive) return
-    await this.document.patchChange()
-    this.document.forceSync()
-    await wait(50)
   }
 
   public async checkPosition(): Promise<void> {
@@ -253,13 +256,14 @@ export class SnippetSession {
   }
 
   public findPlaceholder(range: Range): CocSnippetPlaceholder | null {
+    if (!this.snippet) return null
     let { placeholder } = this
     if (placeholder && rangeInRange(range, placeholder.range)) return placeholder
     return this.snippet.getPlaceholderByRange(range) || null
   }
 
   public get placeholder(): CocSnippetPlaceholder {
-    if (!this.snippet) return
+    if (!this.snippet) return null
     return this.snippet.getPlaceholderById(this._currId)
   }
 

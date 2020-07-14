@@ -14,7 +14,7 @@ import { CodeAction, Documentation, TagDefinition } from '../types'
 import { disposeAll, wait } from '../util'
 import { getSymbolKind } from '../util/convert'
 import { equals } from '../util/object'
-import { emptyRange, positionInRange, rangeInRange } from '../util/position'
+import { emptyRange, positionInRange, rangeInRange, getChangedFromEdits } from '../util/position'
 import { byteLength, isWord } from '../util/string'
 import workspace from '../workspace'
 import CodeLensManager from './codelens'
@@ -68,6 +68,7 @@ interface Preferences {
   formatOnInsertLeave: boolean
   hoverTarget: string
   previewAutoClose: boolean
+  previewMaxHeight: number
   bracketEnterImprove: boolean
   currentFunctionSymbolAutoUpdate: boolean
 }
@@ -75,7 +76,7 @@ interface Preferences {
 export default class Handler {
   private preferences: Preferences
   private documentHighlighter: DocumentHighlighter
-  /*bufnr and srcId list*/
+  /* bufnr and srcId list*/
   private hoverPosition: [number, number, number]
   private colors: Colors
   private hoverFactory: FloatFactory
@@ -123,7 +124,7 @@ export default class Handler {
       if (cursor[0] - 1 == line) {
         let currline = doc.getline(cursor[0] - 1)
         let col = byteLength(currline.slice(0, character)) + 1
-        if (cursor[1] > col) return
+        if (cursor[1] >= col) return
       }
       this.signatureFactory.close()
     }, null, this.disposables)
@@ -144,7 +145,7 @@ export default class Handler {
     }, null, this.disposables)
     events.on('Enter', async bufnr => {
       let { bracketEnterImprove } = this.preferences
-      await this.onCharacterType('\n', bufnr)
+      await this.tryFormatOnType('\n', bufnr)
       if (bracketEnterImprove) {
         let line = (await nvim.call('line', '.') as number) - 1
         let doc = workspace.getDocument(bufnr)
@@ -174,7 +175,7 @@ export default class Handler {
               newText = newText + '\\ '
             }
             edits.push({ range: Range.create(pos, pos), newText })
-            await doc.applyEdits(nvim, edits)
+            await doc.applyEdits(edits)
             await workspace.moveTo(Position.create(line, newText.length - 1))
           }
         }
@@ -183,21 +184,21 @@ export default class Handler {
 
     events.on('TextChangedI', async bufnr => {
       let curr = Date.now()
-      if (!lastInsert || curr - lastInsert > 500) return
+      if (!lastInsert || curr - lastInsert > 300) return
+      lastInsert = null
       let doc = workspace.getDocument(bufnr)
-      if (!doc) return
-      let { triggerSignatureHelp, triggerSignatureWait, formatOnType } = this.preferences
+      if (!doc || doc.isCommandLine || !doc.attached) return
+      let { triggerSignatureHelp, formatOnType } = this.preferences
       if (!triggerSignatureHelp && !formatOnType) return
       let [pos, line] = await nvim.eval('[coc#util#cursor(), getline(".")]') as [[number, number], string]
       let pre = pos[1] == 0 ? '' : line.slice(pos[1] - 1, pos[1])
       if (!pre || isWord(pre)) return
-      if (!doc.paused) await this.onCharacterType(pre, bufnr)
+      await this.tryFormatOnType(pre, bufnr)
       if (triggerSignatureHelp && languages.shouldTriggerSignatureHelp(doc.textDocument, pre)) {
-        doc.forceSync()
-        await wait(Math.min(Math.max(triggerSignatureWait, 50), 300))
-        if (!workspace.insertMode) return
         try {
-          let cursor = await nvim.call('coc#util#cursor')
+          let [mode, cursor] = await nvim.eval('[mode(),coc#util#cursor()]') as [string, [number, number]]
+          if (mode !== 'i') return
+          await synchronizeDocument(doc)
           await this.triggerSignatureHelp(doc, { line: cursor[0], character: cursor[1] })
         } catch (e) {
           logger.error(`Error on signature help:`, e)
@@ -209,7 +210,7 @@ export default class Handler {
       if (!this.preferences.formatOnInsertLeave) return
       await wait(30)
       if (workspace.insertMode) return
-      await this.onCharacterType('\n', bufnr, true)
+      await this.tryFormatOnType('\n', bufnr, true)
     }, null, this.disposables)
     events.on('CursorMoved', debounce((bufnr: number, cursor: [number, number]) => {
       if (!this.preferences.previewAutoClose || !this.hoverPosition) return
@@ -223,12 +224,8 @@ export default class Handler {
     }, 100), null, this.disposables)
 
     if (this.preferences.currentFunctionSymbolAutoUpdate) {
-      events.on('CursorHold', async () => {
-        try {
-          await this.getCurrentFunctionSymbol()
-        } catch (e) {
-          logger.error(e)
-        }
+      events.on('CursorHold', () => {
+        this.getCurrentFunctionSymbol().logError()
       }, null, this.disposables)
     }
 
@@ -239,7 +236,7 @@ export default class Handler {
         nvim.command('setlocal conceallevel=2 nospell nofoldenable wrap', true)
         nvim.command('setlocal bufhidden=wipe nobuflisted', true)
         nvim.command('setfiletype markdown', true)
-        nvim.command(`exe "normal! z${this.documentLines.length}\\<cr>"`, true)
+        nvim.command(`exe "normal! z${Math.min(this.documentLines.length, this.preferences.previewMaxHeight)}\\<cr>"`, true)
         await nvim.resumeNotification()
         return this.documentLines.join('\n')
       }
@@ -399,7 +396,7 @@ export default class Handler {
     } else {
       symbols.sort(sortSymbolInformations)
       for (let sym of symbols) {
-        let { name, kind, location, containerName } = sym as SymbolInformation
+        let { name, kind, location, containerName } = sym
         if (!containerName || !pre) {
           level = 0
         } else {
@@ -436,10 +433,7 @@ export default class Handler {
     if (!range || emptyRange(range)) return null
     let curname = doc.textDocument.getText(range)
     if (languages.hasProvider('rename', doc.textDocument)) {
-      if (doc.dirty) {
-        doc.forceSync()
-        await wait(30)
-      }
+      await synchronizeDocument(doc)
       let res = await languages.prepareRename(doc.textDocument, position)
       if (res === false) return null
       let edit = await languages.provideRenameEdits(doc.textDocument, position, curname)
@@ -449,9 +443,7 @@ export default class Handler {
     let ranges = doc.getSymbolRanges(curname)
     return {
       changes: {
-        [doc.uri]: ranges.map(r => {
-          return { range: r, newText: curname }
-        })
+        [doc.uri]: ranges.map(r => ({ range: r, newText: curname }))
       }
     }
   }
@@ -468,10 +460,7 @@ export default class Handler {
       workspace.showMessage(`Rename provider not found for current document`, 'error')
       return false
     }
-    if (doc.dirty) {
-      doc.forceSync()
-      await wait(30)
-    }
+    await synchronizeDocument(doc)
     let res = await languages.prepareRename(doc.textDocument, position)
     if (res === false) {
       workspace.showMessage('Invalid position for renmame', 'error')
@@ -499,16 +488,18 @@ export default class Handler {
     let bufnr = await this.nvim.eval('bufnr("%")') as number
     let document = workspace.getDocument(bufnr)
     if (!document) return false
+    await synchronizeDocument(document)
     let options = await workspace.getFormatOptions(document.uri)
     let textEdits = await languages.provideDocumentFormattingEdits(document.textDocument, options)
     if (!textEdits || textEdits.length == 0) return false
-    await document.applyEdits(this.nvim, textEdits)
+    await document.applyEdits(textEdits)
     return true
   }
 
   public async documentRangeFormatting(mode: string): Promise<number> {
     let document = await workspace.document
     if (!document) return -1
+    await synchronizeDocument(document)
     let range: Range
     if (mode) {
       range = await workspace.getSelectedRange(mode, document)
@@ -524,7 +515,7 @@ export default class Handler {
     let options = await workspace.getFormatOptions(document.uri)
     let textEdits = await languages.provideDocumentRangeFormattingEdits(document.textDocument, range, options)
     if (!textEdits) return - 1
-    await document.applyEdits(this.nvim, textEdits)
+    await document.applyEdits(textEdits)
     return 0
   }
 
@@ -538,7 +529,8 @@ export default class Handler {
     }
     let definitions = await languages.getDefinition(document.textDocument, position)
     return definitions.map(location => {
-      const filename = URI.parse(location.uri).fsPath
+      let parsedURI = URI.parse(location.uri)
+      const filename = parsedURI.scheme == 'file' ? parsedURI.fsPath : parsedURI.toString()
       return {
         name: word,
         cmd: `keepjumps ${location.range.start.line + 1} | normal ${location.range.start.character + 1}|`,
@@ -563,17 +555,7 @@ export default class Handler {
   public async getCodeActions(bufnr: number, range?: Range, only?: CodeActionKind[]): Promise<CodeAction[]> {
     let document = workspace.getDocument(bufnr)
     if (!document) return []
-    if (!range) {
-      const position = await workspace.getCursorPosition()
-      range = document.getWordRangeAtPosition(position)
-    }
-    if (!range) {
-      let lnum = await this.nvim.call('line', ['.'])
-      range = {
-        start: { line: lnum - 1, character: 0 },
-        end: { line: lnum, character: 0 }
-      }
-    }
+    range = range || Range.create(0, 0, document.lineCount, 0)
     let diagnostics = diagnosticManager.getDiagnosticsInRange(document.textDocument, range)
     let context: CodeActionContext = { diagnostics }
     if (only && Array.isArray(only)) context.only = only
@@ -601,21 +583,25 @@ export default class Handler {
   public async doCodeAction(mode: string | null, only?: CodeActionKind[] | string): Promise<void> {
     let bufnr = await this.nvim.call('bufnr', '%')
     let range: Range
-    if (mode) range = await workspace.getSelectedRange(mode, workspace.getDocument(bufnr))
+    let doc = workspace.getDocument(bufnr)
+    if (!doc) return
+    await synchronizeDocument(doc)
+    if (mode) range = await workspace.getSelectedRange(mode, doc)
     let codeActions = await this.getCodeActions(bufnr, range, Array.isArray(only) ? only : null)
+    if (only && typeof only == 'string') {
+      codeActions = codeActions.filter(o => o.title == only || (o.command && o.command.title == only))
+    }
     if (!codeActions || codeActions.length == 0) {
-      workspace.showMessage('No action available', 'warning')
+      workspace.showMessage(`CodeAction${only ? ' ' + only : ''} not found`, 'warning')
       return
     }
-    if (only && typeof only == 'string') {
-      let action = codeActions.find(o => o.title == only || (o.command && o.command.title == only))
-      if (!action) return workspace.showMessage(`action "${only}" not found.`, 'warning')
-      await this.applyCodeAction(action)
-    } else {
+    if (!only || codeActions.length > 1) {
       let idx = await workspace.showQuickpick(codeActions.map(o => o.title))
       if (idx == -1) return
       let action = codeActions[idx]
       if (action) await this.applyCodeAction(action)
+    } else {
+      await this.applyCodeAction(codeActions[0])
     }
   }
 
@@ -635,7 +621,7 @@ export default class Handler {
   }
 
   public async doQuickfix(): Promise<boolean> {
-    let actions = await this.getCurrentCodeActions(null, [CodeActionKind.QuickFix])
+    let actions = await this.getCurrentCodeActions('n', [CodeActionKind.QuickFix])
     if (!actions || actions.length == 0) {
       workspace.showMessage('No quickfix action available', 'warning')
       return false
@@ -676,6 +662,11 @@ export default class Handler {
 
   public async fold(kind?: string): Promise<boolean> {
     let document = await workspace.document
+    if (!document || !document.attached) {
+      workspace.showMessage('document not attached', 'warning')
+      return false
+    }
+    await synchronizeDocument(document)
     let win = await this.nvim.window
     let foldmethod = await win.getOption('foldmethod')
     if (foldmethod != 'manual') {
@@ -776,11 +767,13 @@ export default class Handler {
     return res
   }
 
-  public async selectFunction(inner: boolean, visualmode: string): Promise<void> {
-    let { nvim } = this
-    let bufnr = await nvim.eval('bufnr("%")') as number
-    let doc = workspace.getDocument(bufnr)
-    if (!doc) return
+  /*
+   * supportedSymbols must be string values of symbolKind
+   */
+  public async selectSymbolRange(inner: boolean, visualmode: string, supportedSymbols: string[]): Promise<void> {
+    let doc = await workspace.document
+    if (!doc || !doc.attached) return
+    await synchronizeDocument(doc)
     let range: Range
     if (visualmode) {
       range = await workspace.getSelectedRange(visualmode, doc)
@@ -794,10 +787,7 @@ export default class Handler {
       return
     }
     let properties = symbols.filter(s => s.kind == 'Property')
-    symbols = symbols.filter(s => [
-      'Method',
-      'Function',
-    ].includes(s.kind))
+    symbols = symbols.filter(s => supportedSymbols.includes(s.kind))
     let selectRange: Range
     for (let sym of symbols.reverse()) {
       if (sym.range && !equals(sym.range, range) && rangeInRange(range, sym.range)) {
@@ -822,11 +812,11 @@ export default class Handler {
     if (selectRange) await workspace.selectRange(selectRange)
   }
 
-  private async onCharacterType(ch: string, bufnr: number, insertLeave = false): Promise<void> {
+  private async tryFormatOnType(ch: string, bufnr: number, insertLeave = false): Promise<void> {
     if (!ch || isWord(ch) || !this.preferences.formatOnType) return
     if (snippetManager.getSession(bufnr) != null) return
     let doc = workspace.getDocument(bufnr)
-    if (!doc || doc.paused) return
+    if (!doc || !doc.attached) return
     if (!languages.hasOnTypeProvider(ch, doc.textDocument)) return
     const filetypes = this.preferences.formatOnTypeFiletypes
     if (filetypes.length && !filetypes.includes(doc.filetype)) {
@@ -835,33 +825,15 @@ export default class Handler {
     }
     let position = await workspace.getCursorPosition()
     let origLine = doc.getline(position.line)
-    let { changedtick, dirty } = doc
-    if (dirty) {
-      doc.forceSync()
-      await wait(50)
-    }
     let pos: Position = insertLeave ? { line: position.line, character: origLine.length } : position
-    try {
-      let edits = await languages.provideDocumentOnTypeEdits(ch, doc.textDocument, pos)
-      // changed by other process
-      if (doc.changedtick != changedtick || edits == null) return
-      if (insertLeave) {
-        edits = edits.filter(edit => {
-          return edit.range.start.line < position.line + 1
-        })
-      }
-      if (edits && edits.length) {
-        await doc.applyEdits(this.nvim, edits)
-        let newLine = doc.getline(position.line)
-        if (newLine.length > origLine.length) {
-          let character = position.character + (newLine.length - origLine.length)
-          await workspace.moveTo(Position.create(position.line, character))
-        }
-      }
-    } catch (e) {
-      if (!/timeout\s/.test(e.message)) {
-        console.error(`Error on formatOnType: ${e.message}`) // tslint:disable-line
-      }
+    let { changedtick } = doc
+    await synchronizeDocument(doc)
+    let edits = await languages.provideDocumentOnTypeEdits(ch, doc.textDocument, pos)
+    if (edits && edits.length && doc.changedtick == changedtick) {
+      let changed = getChangedFromEdits(position, edits)
+      await doc.applyEdits(edits)
+      let to = changed ? Position.create(position.line + changed.line, position.character + changed.character) : null
+      if (to) await workspace.moveTo(to)
     }
   }
 
@@ -875,8 +847,6 @@ export default class Handler {
       this.signatureFactory.close()
       return
     }
-    let idx = Math.max(part.lastIndexOf(','), part.lastIndexOf('('))
-    if (idx != -1) position.character = idx + 1
     let tokenSource = this.signatureTokenSource = new CancellationTokenSource()
     let token = tokenSource.token
     let timer = setTimeout(() => {
@@ -897,6 +867,7 @@ export default class Handler {
       if (active) signatures.unshift(active)
     }
     if (this.preferences.signatureHelpTarget == 'float') {
+      let offset = 0
       let paramDoc: string | MarkupContent = null
       let docs: Documentation[] = signatures.reduce((p: Documentation[], c, idx) => {
         let activeIndexes: [number, number] = null
@@ -924,6 +895,9 @@ export default class Handler {
         if (activeIndexes == null) {
           activeIndexes = [nameIndex + 1, nameIndex + 1]
         }
+        if (offset == 0) {
+          offset = activeIndexes[0] + 1
+        }
         p.push({
           content: c.label,
           filetype: document.filetype,
@@ -950,13 +924,14 @@ export default class Handler {
         }
         return p
       }, [])
-      let offset = 0
       let session = snippetManager.getSession(document.bufnr)
       if (session && session.isActive) {
         let { value } = session.placeholder
-        if (value.indexOf('\n') == -1) offset = value.length
+        if (!value.includes('\n')) offset += value.length
+        this.signaturePosition = Position.create(position.line, position.character - value.length)
+      } else {
+        this.signaturePosition = position
       }
-      this.signaturePosition = position
       await this.signatureFactory.create(docs, true, offset)
       // show float
     } else {
@@ -1027,6 +1002,32 @@ export default class Handler {
     return await this.triggerSignatureHelp(document, position)
   }
 
+  public async findLocations(id: string, method: string, params: any, openCommand?: string | false): Promise<void> {
+    let { document, position } = await workspace.getCurrentState()
+    params = params || {}
+    Object.assign(params, {
+      textDocument: { uri: document.uri },
+      position
+    })
+    let res: any = await services.sendRequest(id, method, params)
+    res = res || []
+    let locations: Location[] = []
+    if (Array.isArray(res)) {
+      locations = res as Location[]
+    } else if (res.hasOwnProperty('location') && res.hasOwnProperty('children')) {
+      let getLocation = (item: any): void => {
+        locations.push(item.location as Location)
+        if (item.children && item.children.length) {
+          for (let loc of item.children) {
+            getLocation(loc)
+          }
+        }
+      }
+      getLocation(res)
+    }
+    await this.handleLocations(locations, openCommand)
+  }
+
   public async handleLocations(definition: Definition | LocationLink[], openCommand?: string | false): Promise<void> {
     if (!definition) return
     let locations: Location[] = Array.isArray(definition) ? definition as Location[] : [definition]
@@ -1035,7 +1036,7 @@ export default class Handler {
     if (len == 1 && openCommand !== false) {
       let location = definition[0] as Location
       if (LocationLink.is(definition[0])) {
-        let link = definition[0] as LocationLink
+        let link = definition[0]
         location = Location.create(link.targetUri, link.targetRange)
       }
       let { uri, range } = location
@@ -1190,7 +1191,7 @@ export default class Handler {
       } else if (typeof contents == 'string') {
         lines.push(...contents.split('\n'))
         docs.push({ content: contents, filetype: 'markdown' })
-      } else if (MarkedString.is(contents)) { // tslint:disable-line
+      } else if (MarkedString.is(contents)) {
         let content = contents.value.trim()
         if (target == 'preview') {
           content = '``` ' + contents.language + '\n' + content + '\n```'
@@ -1221,13 +1222,13 @@ export default class Handler {
 
   private getPreferences(): void {
     let config = workspace.getConfiguration('coc.preferences')
-    let signatureConfig = workspace.getConfiguration('signature')
     let hoverTarget = config.get<string>('hoverTarget', 'float')
     if (hoverTarget == 'float' && !workspace.env.floating && !workspace.env.textprop) {
       hoverTarget = 'preview'
     }
+    let signatureConfig = workspace.getConfiguration('signature')
     let signatureHelpTarget = signatureConfig.get<string>('target', 'float')
-    if (signatureHelpTarget == 'float' && !workspace.env.floating && !workspace.env.textprop) {
+    if (signatureHelpTarget == 'float' && !workspace.floatSupported) {
       signatureHelpTarget = 'echo'
     }
     this.labels = workspace.getConfiguration('suggest').get<any>('completionItemKindLabels', {})
@@ -1236,14 +1237,15 @@ export default class Handler {
       signatureHelpTarget,
       signatureMaxHeight: signatureConfig.get<number>('maxWindowHeight', 8),
       triggerSignatureHelp: signatureConfig.get<boolean>('enable', true),
-      triggerSignatureWait: signatureConfig.get<number>('triggerSignatureWait', 50),
+      triggerSignatureWait: Math.max(signatureConfig.get<number>('triggerSignatureWait', 50), 50),
       signaturePreferAbove: signatureConfig.get<boolean>('preferShownAbove', true),
-      signatureFloatMaxWidth: signatureConfig.get<number>('floatMaxWidth', 80),
+      signatureFloatMaxWidth: signatureConfig.get<number>('floatMaxWidth', 60),
       signatureHideOnChange: signatureConfig.get<boolean>('hideOnTextChange', false),
       formatOnType: config.get<boolean>('formatOnType', false),
       formatOnTypeFiletypes: config.get('formatOnTypeFiletypes', []),
       formatOnInsertLeave: config.get<boolean>('formatOnInsertLeave', false),
       bracketEnterImprove: config.get<boolean>('bracketEnterImprove', true),
+      previewMaxHeight: config.get<number>('previewMaxHeight', 12),
       previewAutoClose: config.get<boolean>('previewAutoClose', false),
       currentFunctionSymbolAutoUpdate: config.get<boolean>('currentFunctionSymbolAutoUpdate', false),
     }
@@ -1332,4 +1334,12 @@ function isEmpty(location: any): boolean {
 
 function isDocumentSymbols(a: DocumentSymbol[] | SymbolInformation[]): a is DocumentSymbol[] {
   return isDocumentSymbol(a[0])
+}
+
+async function synchronizeDocument(doc: Document): Promise<void> {
+  let { changedtick } = doc
+  await doc.patchChange()
+  if (changedtick != doc.changedtick) {
+    await wait(50)
+  }
 }

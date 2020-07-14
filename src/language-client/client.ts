@@ -1,10 +1,10 @@
-/*---------------------------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/*tslint:disable*/
+/* eslint-disable */
 import path from 'path'
-import { ApplyWorkspaceEditParams, ApplyWorkspaceEditRequest, ApplyWorkspaceEditResponse, CancellationToken, ClientCapabilities, CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionParams, CodeActionRegistrationOptions, CodeActionRequest, CodeLens, CodeLensOptions, CodeLensRegistrationOptions, CodeLensRequest, CodeLensResolveRequest, Command, CompletionContext, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions, CompletionRegistrationOptions, CompletionRequest, CompletionResolveRequest, createProtocolConnection, DeclarationRequest, Definition, DefinitionOptions, DefinitionRegistrationOptions, DefinitionRequest, Diagnostic, DidChangeConfigurationNotification, DidChangeConfigurationParams, DidChangeConfigurationRegistrationOptions, DidChangeTextDocumentNotification, DidChangeTextDocumentParams, DidChangeWatchedFilesNotification, DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions, DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams, Disposable, DocumentColorRequest, DocumentFormattingOptions, DocumentFormattingParams, DocumentFormattingRequest, DocumentHighlight, DocumentHighlightOptions, DocumentHighlightRegistrationOptions, DocumentHighlightRequest, DocumentLink, DocumentLinkOptions, DocumentLinkRegistrationOptions, DocumentLinkRequest, DocumentLinkResolveRequest, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentOnTypeFormattingRegistrationOptions, DocumentOnTypeFormattingRequest, DocumentRangeFormattingOptions, DocumentRangeFormattingParams, DocumentRangeFormattingRegistrationOptions, DocumentRangeFormattingRequest, DocumentSelector, DocumentSymbol, DocumentSymbolOptions, DocumentSymbolRegistrationOptions, DocumentSymbolRequest, Emitter, ErrorCodes, Event, ExecuteCommandParams, ExecuteCommandRegistrationOptions, ExecuteCommandRequest, ExitNotification, FailureHandlingKind, FileChangeType, FileEvent, FoldingRangeRequest, FormattingOptions, GenericNotificationHandler, GenericRequestHandler, Hover, HoverOptions, HoverRegistrationOptions, HoverRequest, ImplementationRequest, InitializedNotification, InitializeError, InitializeParams, InitializeRequest, InitializeResult, Location, Logger, LogMessageNotification, LogMessageParams, MarkupKind, Message, MessageReader, MessageType, MessageWriter, NotificationHandler, NotificationHandler0, NotificationType, NotificationType0, Position, PrepareRenameRequest, ProgressToken, ProgressType, Proposed, PublishDiagnosticsNotification, PublishDiagnosticsParams, Range, ReferenceOptions, ReferenceRegistrationOptions, ReferencesRequest, RegistrationParams, RegistrationRequest, RenameOptions, RenameParams, RenameRegistrationOptions, RenameRequest, RequestHandler, RequestHandler0, RequestType, RequestType0, ResourceOperationKind, ResponseError, RPCMessageType, SelectionRangeRequest, ServerCapabilities, ShowMessageNotification, ShowMessageParams, ShowMessageRequest, ShutdownRequest, SignatureHelp, SignatureHelpOptions, SignatureHelpRegistrationOptions, SignatureHelpRequest, StaticRegistrationOptions, SymbolInformation, SymbolKind, SymbolTag, TelemetryEventNotification, TextDocument, TextDocumentChangeRegistrationOptions, TextDocumentEdit, TextDocumentPositionParams, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Trace, TraceFormat, TraceOptions, Tracer, TypeDefinitionRequest, UnregistrationParams, UnregistrationRequest, WatchKind, WillSaveTextDocumentNotification, WillSaveTextDocumentParams, WillSaveTextDocumentWaitUntilRequest, WorkDoneProgressOptions, WorkspaceEdit, WorkspaceFolder, WorkspaceSymbolRegistrationOptions, WorkspaceSymbolRequest, DiagnosticSeverity } from 'vscode-languageserver-protocol'
+import { ApplyWorkspaceEditParams, ApplyWorkspaceEditRequest, ApplyWorkspaceEditResponse, CancellationToken, ClientCapabilities, CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionParams, CodeActionRegistrationOptions, CodeActionRequest, CodeLens, CodeLensOptions, CodeLensRegistrationOptions, CodeLensRequest, CodeLensResolveRequest, Command, CompletionContext, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions, CompletionRegistrationOptions, CompletionRequest, CompletionResolveRequest, createProtocolConnection, DeclarationRequest, Definition, DefinitionOptions, DefinitionRegistrationOptions, DefinitionRequest, Diagnostic, DiagnosticSeverity, DiagnosticTag, DidChangeConfigurationNotification, DidChangeConfigurationParams, DidChangeConfigurationRegistrationOptions, DidChangeTextDocumentNotification, DidChangeTextDocumentParams, DidChangeWatchedFilesNotification, DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions, DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams, Disposable, DocumentColorRequest, DocumentFormattingOptions, DocumentFormattingParams, DocumentFormattingRequest, DocumentHighlight, DocumentHighlightOptions, DocumentHighlightRegistrationOptions, DocumentHighlightRequest, DocumentLink, DocumentLinkOptions, DocumentLinkRegistrationOptions, DocumentLinkRequest, DocumentLinkResolveRequest, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentOnTypeFormattingRegistrationOptions, DocumentOnTypeFormattingRequest, DocumentRangeFormattingOptions, DocumentRangeFormattingParams, DocumentRangeFormattingRegistrationOptions, DocumentRangeFormattingRequest, DocumentSelector, DocumentSymbol, DocumentSymbolOptions, DocumentSymbolRegistrationOptions, DocumentSymbolRequest, Emitter, ErrorCodes, Event, ExecuteCommandParams, ExecuteCommandRegistrationOptions, ExecuteCommandRequest, ExitNotification, FailureHandlingKind, FileChangeType, FileEvent, FoldingRangeRequest, FormattingOptions, GenericNotificationHandler, GenericRequestHandler, Hover, HoverOptions, HoverRegistrationOptions, HoverRequest, ImplementationRequest, InitializedNotification, InitializeError, InitializeParams, InitializeRequest, InitializeResult, Location, Logger, LogMessageNotification, LogMessageParams, MarkupKind, Message, MessageReader, MessageType, MessageWriter, NotificationHandler, NotificationHandler0, NotificationType, NotificationType0, Position, PrepareRenameRequest, ProgressToken, ProgressType, Proposed, PublishDiagnosticsNotification, PublishDiagnosticsParams, Range, ReferenceOptions, ReferenceRegistrationOptions, ReferencesRequest, RegistrationParams, RegistrationRequest, RenameOptions, RenameParams, RenameRegistrationOptions, RenameRequest, RequestHandler, RequestHandler0, RequestType, RequestType0, ResourceOperationKind, ResponseError, RPCMessageType, SelectionRangeRequest, ServerCapabilities, ShowMessageNotification, ShowMessageParams, ShowMessageRequest, ShutdownRequest, SignatureHelp, SignatureHelpOptions, SignatureHelpRegistrationOptions, SignatureHelpRequest, StaticRegistrationOptions, SymbolInformation, SymbolKind, SymbolTag, TelemetryEventNotification, TextDocument, TextDocumentChangeRegistrationOptions, TextDocumentEdit, TextDocumentPositionParams, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Trace, TraceFormat, TraceOptions, Tracer, TypeDefinitionRequest, UnregistrationParams, UnregistrationRequest, WatchKind, WillSaveTextDocumentNotification, WillSaveTextDocumentParams, WillSaveTextDocumentWaitUntilRequest, WorkDoneProgressOptions, WorkspaceEdit, WorkspaceFolder, WorkspaceSymbolRegistrationOptions, WorkspaceSymbolRequest } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
 import commands from '../commands'
 import languages from '../languages'
@@ -316,7 +316,7 @@ class DefaultErrorHandler implements ErrorHandler {
     } else {
       let diff = this.restarts[this.restarts.length - 1] - this.restarts[0]
       if (diff <= 3 * 60 * 1000) {
-        logger.error(`The ${this.name} server crashed 5 times in the last 3 minutes. The server will not be restarted.`)
+        workspace.showMessage(`The "${this.name}" server crashed 5 times in the last 3 minutes. The server will not be restarted.`, 'error')
         return CloseAction.DoNotRestart
       } else {
         this.restarts.shift()
@@ -688,6 +688,7 @@ export interface LanguageClientOptions {
   diagnosticCollectionName?: string
   disableDynamicRegister?: boolean
   disableWorkspaceFolders?: boolean
+  disableSnippetCompletion?: boolean
   disableDiagnostics?: boolean
   disableCompletion?: boolean
   outputChannelName?: string
@@ -709,6 +710,7 @@ export interface LanguageClientOptions {
 interface ResolvedClientOptions {
   ignoredRootPaths?: string[]
   disableWorkspaceFolders: boolean
+  disableSnippetCompletion: boolean
   disableDynamicRegister: boolean
   disableDiagnostics: boolean
   disableCompletion: boolean
@@ -1751,13 +1753,8 @@ export interface WorkspaceProviderFeature<PR> {
   getProviders(): PR[]
 }
 
-interface WorkspaceFeatureRegistration<PR> {
-  disposable: Disposable
-  provider: PR
-}
-
 abstract class WorkspaceFeature<RO, PR> implements DynamicFeature<RO> {
-  protected _registrations: Map<string, WorkspaceFeatureRegistration<PR>> = new Map()
+  protected _registrations: Map<string, Disposable> = new Map()
 
   constructor(
     protected _client: BaseLanguageClient,
@@ -1780,31 +1777,21 @@ abstract class WorkspaceFeature<RO, PR> implements DynamicFeature<RO> {
       throw new Error(`Register called on wrong feature. Requested ${message.method} but reached feature ${this.messages.method}`)
     }
     const registration = this.registerLanguageProvider(data.registerOptions)
-    this._registrations.set(data.id, { disposable: registration[0], provider: registration[1] })
+    this._registrations.set(data.id, registration)
   }
 
-  protected abstract registerLanguageProvider(options: RO): [Disposable, PR]
+  protected abstract registerLanguageProvider(options: RO): Disposable
 
   public unregister(id: string): void {
     const registration = this._registrations.get(id)
-    if (registration) {
-      registration.disposable.dispose()
-    }
+    if (registration) registration.dispose()
   }
 
   public dispose(): void {
     this._registrations.forEach(value => {
-      value.disposable.dispose()
+      value.dispose()
     })
     this._registrations.clear()
-  }
-
-  public getProviders(): PR[] {
-    const result: PR[] = []
-    for (const registration of this._registrations.values()) {
-      result.push(registration.provider)
-    }
-    return result
   }
 }
 
@@ -1814,16 +1801,18 @@ export interface ProvideResolveFeature<T1 extends Function, T2 extends Function>
 }
 
 class CompletionItemFeature extends TextDocumentFeature<CompletionOptions, CompletionRegistrationOptions, CompletionItemProvider> {
+  private index: number
   constructor(client: BaseLanguageClient) {
     super(client, CompletionRequest.type)
   }
 
   public fillClientCapabilities(capabilites: ClientCapabilities): void {
+    let snippetSupport = this._client.clientOptions.disableSnippetCompletion !== true
     let completion = ensure(ensure(capabilites, 'textDocument')!, 'completion')!
     completion.dynamicRegistration = true
     completion.contextSupport = true
     completion.completionItem = {
-      snippetSupport: true,
+      snippetSupport,
       commitCharactersSupport: true,
       documentationFormat: [MarkupKind.Markdown, MarkupKind.PlainText],
       deprecatedSupport: true,
@@ -1837,6 +1826,7 @@ class CompletionItemFeature extends TextDocumentFeature<CompletionOptions, Compl
     capabilities: ServerCapabilities,
     documentSelector: DocumentSelector
   ): void {
+    this.index = 0
     const options = this.getRegistrationOptions(documentSelector, capabilities.completionProvider)
     if (!options) {
       return
@@ -1851,6 +1841,7 @@ class CompletionItemFeature extends TextDocumentFeature<CompletionOptions, Compl
     let triggerCharacters = options.triggerCharacters || []
     let allCommitCharacters = options.allCommitCharacters || []
     let priority = (options as any).priority as number
+    this.index = this.index + 1
     const provider: CompletionItemProvider = {
       provideCompletionItems: (document: TextDocument, position: Position, token: CancellationToken, context: CompletionContext): ProviderResult<CompletionList | CompletionItem[]> => {
         const client = this._client
@@ -1894,7 +1885,7 @@ class CompletionItemFeature extends TextDocumentFeature<CompletionOptions, Compl
 
     const languageIds = cv.asLanguageIds(options.documentSelector!)
     const disposable = languages.registerCompletionItemProvider(
-      this._client.id,
+      this._client.id + '-' + this.index,
       'LS',
       languageIds,
       provider,
@@ -2197,15 +2188,15 @@ class DocumentSymbolFeature extends TextDocumentFeature<
   }
 
   public fillClientCapabilities(capabilites: ClientCapabilities): void {
-    let symbolCapabilities = ensure(
-      ensure(capabilites, 'textDocument')!,
-      'documentSymbol'
-    )!
+    let symbolCapabilities = ensure(ensure(capabilites, 'textDocument')!, 'documentSymbol')! as any
     symbolCapabilities.dynamicRegistration = true
     symbolCapabilities.symbolKind = {
       valueSet: SupportedSymbolKinds
     }
     symbolCapabilities.hierarchicalDocumentSymbolSupport = true
+    symbolCapabilities.tagSupport = {
+      valueSet: SupportedSymbolTags
+    }
   }
 
   public initialize(
@@ -2278,10 +2269,13 @@ class WorkspaceSymbolFeature extends WorkspaceFeature<WorkspaceSymbolRegistratio
     let symbolCapabilities = ensure(
       ensure(capabilites, 'workspace')!,
       'symbol'
-    )!
+    )! as any
     symbolCapabilities.dynamicRegistration = true
     symbolCapabilities.symbolKind = {
       valueSet: SupportedSymbolKinds
+    }
+    symbolCapabilities.tagSupport = {
+      valueSet: SupportedSymbolTags
     }
   }
 
@@ -2299,7 +2293,7 @@ class WorkspaceSymbolFeature extends WorkspaceFeature<WorkspaceSymbolRegistratio
     })
   }
 
-  protected registerLanguageProvider(_options: WorkspaceSymbolRegistrationOptions): [Disposable, WorkspaceSymbolProvider] {
+  protected registerLanguageProvider(_options: WorkspaceSymbolRegistrationOptions): Disposable {
     const provider: WorkspaceSymbolProvider = {
       provideWorkspaceSymbols: (query, token) => {
         const client = this._client
@@ -2317,7 +2311,7 @@ class WorkspaceSymbolFeature extends WorkspaceFeature<WorkspaceSymbolRegistratio
           : provideWorkspaceSymbols(query, token)
       }
     }
-    return [languages.registerWorkspaceSymbolProvider(this.documentSelector, provider), provider]
+    return languages.registerWorkspaceSymbolProvider(provider)
   }
 }
 
@@ -3079,6 +3073,7 @@ export abstract class BaseLanguageClient {
     }
     this._clientOptions = {
       disableWorkspaceFolders: clientOptions.disableWorkspaceFolders,
+      disableSnippetCompletion: clientOptions.disableSnippetCompletion,
       disableDynamicRegister: clientOptions.disableDynamicRegister,
       disableDiagnostics: clientOptions.disableDiagnostics,
       disableCompletion: clientOptions.disableCompletion,
@@ -3175,14 +3170,13 @@ export abstract class BaseLanguageClient {
     param: any,
     token?: CancellationToken
   ): Promise<R>
-  public sendRequest<R>(
+  public async sendRequest<R>(
     type: string | RPCMessageType,
     ...params: any[]
   ): Promise<R> {
     if (!this.isConnectionActive()) {
       throw new Error('Language client is not ready yet')
     }
-    this.forceDocumentSync()
     try {
       return this._resolvedConnection!.sendRequest<R>(type, ...params)
     } catch (error) {
@@ -3234,7 +3228,6 @@ export abstract class BaseLanguageClient {
     if (!this.isConnectionActive()) {
       throw new Error('Language client is not ready yet')
     }
-    this.forceDocumentSync()
     try {
       this._resolvedConnection!.sendNotification(type, params)
     } catch (error) {
@@ -3282,7 +3275,6 @@ export abstract class BaseLanguageClient {
     if (!this.isConnectionActive()) {
       throw new Error('Language client is not ready yet')
     }
-    this.forceDocumentSync()
     try {
       this._resolvedConnection!.sendProgress(type, token, value)
     } catch (error) {
@@ -3436,10 +3428,9 @@ export abstract class BaseLanguageClient {
     this._providers = []
     // If we restart then the diagnostics collection is reused.
     if (!this._diagnostics) {
-      let { diagnosticCollectionName } = this._clientOptions
-      this._diagnostics = this._clientOptions
-        ? languages.createDiagnosticCollection(diagnosticCollectionName)
-        : languages.createDiagnosticCollection(this._id)
+      let opts = this._clientOptions
+      let name = opts.diagnosticCollectionName ? opts.diagnosticCollectionName : this._id
+      this._diagnostics = languages.createDiagnosticCollection(name)
     }
 
     this.state = ClientState.Starting
@@ -3496,7 +3487,7 @@ export abstract class BaseLanguageClient {
       }).then(undefined, error => {
         this.state = ClientState.StartFailed
         this._onReadyCallbacks.reject(error)
-        this.error('Starting client failed: ', error)
+        this.error('Starting client failed ', error)
       })
     return Disposable.create(() => {
       if (this.needsStop()) {
@@ -3550,6 +3541,10 @@ export abstract class BaseLanguageClient {
       initializationOptions: Is.func(initializationOptions) ? initializationOptions() : initializationOptions,
       trace: Trace.toString(this._trace),
       workspaceFolders: null,
+      clientInfo: {
+        name: 'coc.nvim',
+        version: workspace.version
+      }
     }
     this.fillInitializeParams(initParams)
     if (progressOnInitialization) {
@@ -3728,7 +3723,6 @@ export abstract class BaseLanguageClient {
         client.onReady().then(() => {
           client.resolveConnection().then(connection => {
             if (client.isConnectionActive()) {
-              client.forceDocumentSync()
               connection.didChangeWatchedFiles({ changes: client._fileEvents })
             }
             client._fileEvents = []
@@ -3740,11 +3734,6 @@ export abstract class BaseLanguageClient {
     }
     const workSpaceMiddleware = this.clientOptions.middleware?.workspace
     workSpaceMiddleware?.didChangeWatchedFile ? workSpaceMiddleware.didChangeWatchedFile(event, didChangeWatchedFile) : didChangeWatchedFile(event)
-  }
-
-  private forceDocumentSync(): void {
-    let doc = workspace.getDocument(workspace.bufnr)
-    if (doc) doc.forceSync(false)
   }
 
   private handleDiagnostics(params: PublishDiagnosticsParams) {
@@ -4028,7 +4017,7 @@ export abstract class BaseLanguageClient {
     const diagnostics = ensure(ensure(result, 'textDocument')!, 'publishDiagnostics')!
     diagnostics.relatedInformation = true
     diagnostics.versionSupport = false
-    // diagnostics.tagSupport = { valueSet: [DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated] }
+    diagnostics.tagSupport = { valueSet: [DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated] }
     for (let feature of this._features) {
       feature.fillClientCapabilities(result)
     }

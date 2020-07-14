@@ -1,4 +1,5 @@
 import { Neovim } from '@chemzqm/neovim'
+import path from 'path'
 import manager from '../../list/manager'
 import { QuickfixItem, IList } from '../../types'
 import helper from '../helper'
@@ -46,6 +47,14 @@ describe('list commands', () => {
     expect(line).toMatch(/manager.test.ts/)
   })
 
+  it('should cancel exists session', async () => {
+    await manager.start(['extensions'])
+    await helper.wait(100)
+    await manager.start(['location'])
+    expect(manager.isActivated).toBe(true)
+    expect(manager.name).toBe('location')
+  })
+
   it('should get list names', () => {
     let names = manager.names
     expect(names.length > 0).toBe(true)
@@ -64,6 +73,28 @@ describe('list commands', () => {
     await helper.wait(60)
     line = await nvim.call('line', '.')
     expect(line).toBe(2)
+  })
+
+  it('should not quit list with --no-quit', async () => {
+    await manager.start(['--normal', '--no-quit', 'location'])
+    await helper.wait(300)
+    let winnr = await nvim.eval('win_getid()')
+    await manager.doAction()
+    await helper.wait(100)
+    let wins = await nvim.windows
+    let ids = wins.map(o => o.id)
+    expect(ids).toContain(winnr)
+  })
+
+  it('should do default action for first item', async () => {
+    await manager.start(['--normal', '--first', 'location'])
+    await helper.wait(100)
+    let name = await nvim.eval('bufname("%")') as string
+    let filename = path.basename(__filename)
+    expect(name.includes(filename)).toBe(true)
+    let pos = await nvim.eval('getcurpos()')
+    expect(pos[1]).toBe(1)
+    expect(pos[2]).toBe(2)
   })
 
   it('should goto next & previous', async () => {
@@ -89,12 +120,15 @@ describe('list commands', () => {
     expect(opts).toEqual({
       numberSelect: true,
       autoPreview: true,
+      first: false,
       input: 'test',
       interactive: false,
       matcher: 'strict',
       ignorecase: true,
       position: 'top',
       mode: 'normal',
+      noQuit: false,
+      noResize: false,
       sort: false
     })
   })
@@ -310,9 +344,7 @@ describe('list configuration', () => {
         }
       }],
       defaultAction: 'open',
-      loadItems: () => {
-        return Promise.resolve([{ label: 'foo' }, { label: 'bar' }])
-      },
+      loadItems: () => Promise.resolve([{ label: 'foo' }, { label: 'bar' }]),
       resolveItem: item => {
         item.label = item.label.slice(0, 1)
         return Promise.resolve(item)

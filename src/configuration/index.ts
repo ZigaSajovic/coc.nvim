@@ -5,7 +5,7 @@ import { Emitter, Event, Disposable } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
 import { ConfigurationChangeEvent, ConfigurationInspect, ConfigurationShape, ConfigurationTarget, ErrorItem, IConfigurationData, IConfigurationModel, WorkspaceConfiguration } from '../types'
 import { deepClone, deepFreeze, mixin } from '../util/object'
-import { watchFile, disposeAll } from '../util'
+import { watchFile, disposeAll, CONFIG_FILE_NAME } from '../util'
 import { Configuration } from './configuration'
 import { ConfigurationModel } from './model'
 import { addToValueTree, loadDefaultConfigurations, parseContentFromFile, getChangedKeys } from './util'
@@ -50,6 +50,10 @@ export default class Configurations {
     }
     this._configuration = Configurations.parse(data)
     this.watchFile(userConfigFile, ConfigurationTarget.User)
+    let folderConfigFile = path.join(process.cwd(), `.vim/${CONFIG_FILE_NAME}`)
+    if (folderConfigFile != userConfigFile && fs.existsSync(folderConfigFile)) {
+      this.addFolderFile(folderConfigFile)
+    }
   }
 
   private parseContentFromFile(filepath: string): IConfigurationModel {
@@ -78,7 +82,7 @@ export default class Configurations {
     contents = deepClone(contents)
     Object.keys(props).forEach(key => {
       addToValueTree(contents, key, props[key], msg => {
-        logger.error(msg) // tslint:disable-line
+        logger.error(msg)
       })
     })
     let data: IConfigurationData = {
@@ -131,8 +135,7 @@ export default class Configurations {
   }
 
   private watchFile(filepath: string, target: ConfigurationTarget): void {
-    if (!fs.existsSync(filepath)) return
-    if (global.hasOwnProperty('__TEST__')) return
+    if (!fs.existsSync(filepath) || global.hasOwnProperty('__TEST__')) return
     let disposable = watchFile(filepath, () => {
       let model = this.parseContentFromFile(filepath)
       this.changeConfiguration(target, model, filepath)
@@ -159,15 +162,15 @@ export default class Configurations {
     this._configuration = configuration
     this._onChange.fire({
       affectsConfiguration: (section, resource) => {
-        if (!resource || target != ConfigurationTarget.Workspace) return changed.indexOf(section) !== -1
+        if (!resource || target != ConfigurationTarget.Workspace) return changed.includes(section)
         let u = URI.parse(resource)
-        if (u.scheme !== 'file') return changed.indexOf(section) !== -1
+        if (u.scheme !== 'file') return changed.includes(section)
         let filepath = u.fsPath
         let preRoot = workspaceConfigFile ? path.resolve(workspaceConfigFile, '../..') : ''
         if (configFile && !isParentFolder(preRoot, filepath, true) && !isParentFolder(path.resolve(configFile, '../..'), filepath)) {
           return false
         }
-        return changed.indexOf(section) !== -1
+        return changed.includes(section)
       }
     })
   }
@@ -291,7 +294,7 @@ export default class Configurations {
     if (typeof config === 'object') {
       mixin(result, config, false)
     }
-    return deepFreeze(result) as WorkspaceConfiguration
+    return deepFreeze(result)
   }
 
   private getFolderConfiguration(uri: string): ConfigurationModel {
@@ -312,7 +315,7 @@ export default class Configurations {
     if (!this.hasFolderConfiguration(rootPath)) {
       let folder = findUp('.vim', rootPath)
       if (folder && folder != os.homedir()) {
-        let file = path.join(folder, 'coc-settings.json')
+        let file = path.join(folder, CONFIG_FILE_NAME)
         if (fs.existsSync(file)) {
           this.addFolderFile(file)
         }

@@ -78,7 +78,7 @@ export default class Colors {
 
   public async highlightColors(document: Document, force = false): Promise<void> {
     if (!this.enabled) return
-    if (['help', 'terminal', 'quickfix'].indexOf(document.buftype) !== -1) return
+    if (['help', 'terminal', 'quickfix'].includes(document.buftype)) return
     let { version, changedtick } = document
     let highlighter = this.getHighlighter(document.bufnr)
     if (!highlighter || (highlighter.version == version && !force)) return
@@ -105,9 +105,9 @@ export default class Colors {
     let presentation = presentations[res]
     let { textEdit, additionalTextEdits, label } = presentation
     if (!textEdit) textEdit = { range: info.range, newText: label }
-    await document.applyEdits(this.nvim, [textEdit])
+    await document.applyEdits([textEdit])
     if (additionalTextEdits) {
-      await document.applyEdits(this.nvim, additionalTextEdits)
+      await document.applyEdits(additionalTextEdits)
     }
   }
 
@@ -132,7 +132,7 @@ export default class Colors {
       alpha: 1
     })
     let document = await workspace.document
-    await document.applyEdits(this.nvim, [{
+    await document.applyEdits([{
       range: info.range,
       newText: `#${hex}`
     }])

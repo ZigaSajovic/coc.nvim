@@ -21,6 +21,7 @@ export default class ListUI {
   public window: Window
   private height: number
   private newTab = false
+  private noResize = false
   private _bufnr = 0
   private currIndex = 0
   private highlights: ListHighlights[] = []
@@ -60,11 +61,7 @@ export default class ListUI {
     events.on('CursorMoved', async (bufnr, cursor) => {
       if (timer) clearTimeout(timer)
       if (bufnr != this.bufnr) return
-      let lnum = cursor[0]
-      if (this.currIndex + 1 != lnum) {
-        this.currIndex = lnum - 1
-        this._onDidChangeLine.fire(lnum)
-      }
+      this.onLineChange(cursor[0] - 1)
     }, null, this.disposables)
 
     events.on('CursorMoved', debounce(async bufnr => {
@@ -78,20 +75,32 @@ export default class ListUI {
     }, 100))
   }
 
+  private onLineChange(index: number): void {
+    if (this.currIndex != index) {
+      this.currIndex = index
+      this._onDidChangeLine.fire(index)
+    }
+  }
+
   public set index(n: number) {
     if (n < 0 || n >= this.items.length) return
-    this.currIndex = n
-    if (this.window) {
-      let { nvim } = this
-      nvim.pauseNotification()
-      this.setCursor(n + 1, 0)
-      nvim.command('redraw', true)
-      nvim.resumeNotification(false, true).logError()
-    }
+    let { nvim } = this
+    nvim.pauseNotification()
+    this.setCursor(n + 1, 0)
+    nvim.command('redraw', true)
+    nvim.resumeNotification(false, true).logError()
   }
 
   public get index(): number {
     return this.currIndex
+  }
+
+  public get firstItem(): ListItem {
+    return this.items[0]
+  }
+
+  public get lastItem(): ListItem {
+    return this.items[this.items.length - 1]
   }
 
   public getItem(delta: number): ListItem {
@@ -105,9 +114,7 @@ export default class ListUI {
     return window.cursor.then(cursor => {
       this.currIndex = cursor[0] - 1
       return this.items[this.currIndex]
-    }, _e => {
-      return null
-    })
+    }, _e => null)
   }
 
   public async echoMessage(item: ListItem): Promise<void> {
@@ -194,12 +201,11 @@ export default class ListUI {
   }
 
   public hide(): void {
-    let { bufnr, window, nvim } = this
+    let { window, nvim } = this
     if (window) {
+      this._bufnr = 0
+      this.window = null
       nvim.call('coc#util#close', [window.id], true)
-    }
-    if (bufnr) {
-      nvim.command(`silent! bd! ${bufnr}`, true)
     }
   }
 
@@ -307,15 +313,16 @@ export default class ListUI {
         })
       })
     }
+    return Promise.reject(new Error('Not creating list'))
   }
 
   public async drawItems(items: ListItem[], name: string, listOptions: ListOptions, reload = false): Promise<void> {
     let { bufnr, config, nvim } = this
     this.newTab = listOptions.position == 'tab'
-    let maxHeight = config.get<number>('maxHeight', 12)
-    let height = Math.max(1, Math.min(items.length, maxHeight))
+    this.noResize = listOptions.noResize
+    let prevLabel = this.items[this.currIndex]?.label
+    let height = this.calculateListHeight(items)
     let limitLines = config.get<number>('limitLines', 30000)
-    let curr = this.items[this.index]
     this.items = items.slice(0, limitLines)
     if (bufnr == 0 && !this.creating) {
       this.creating = true
@@ -330,10 +337,11 @@ export default class ListUI {
     }
     let lines = this.items.map(item => item.label)
     this.clearSelection()
-    await this.setLines(lines, false, reload ? this.currIndex : 0)
-    let item = this.items[this.index] || { label: '' }
-    if (!curr || curr.label != item.label) {
-      this._onDidLineChange.fire(this.index + 1)
+    let newIndex = reload ? this.currIndex : 0
+    await this.setLines(lines, false, newIndex)
+    let currLabel = this.items[newIndex]?.label
+    if (currLabel != prevLabel) {
+      this._onDidLineChange.fire(this.currIndex + 1)
     }
   }
 
@@ -352,10 +360,21 @@ export default class ListUI {
     await this.setLines(append.map(item => item.label), curr > 0, this.currIndex)
   }
 
+  private calculateListHeight(items: ListItem[]): number {
+    let { config } = this
+    let maxHeight = config.get<number>('maxHeight', 10)
+    let minHeight = config.get<number>('minHeight', 1)
+    let height = Math.min(Math.max(minHeight, items.length), maxHeight)
+    this.height = Math.max(1, height)
+
+    return this.height
+  }
+
   private async setLines(lines: string[], append = false, index: number): Promise<void> {
     let { nvim, bufnr, window, config } = this
     if (!bufnr || !window) return
     let resize = !this.newTab && config.get<boolean>('autoResize', true)
+    if (this.noResize === true) resize = false
     let buf = nvim.createBuffer(bufnr)
     nvim.pauseNotification()
     nvim.call('win_gotoid', window.id, true)
@@ -363,9 +382,7 @@ export default class ListUI {
       nvim.call('clearmatches', [], true)
     }
     if (resize) {
-      let maxHeight = config.get<number>('maxHeight', 12)
-      let height = Math.max(1, Math.min(this.items.length, maxHeight))
-      this.height = height
+      let height = this.calculateListHeight(this.items)
       nvim.call('coc#list#set_height', [height], true)
     }
     if (!append) {
@@ -378,6 +395,7 @@ export default class ListUI {
     if (workspace.isVim) {
       nvim.call('coc#list#setlines', [lines, append], true)
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       buf.setLines(lines, { start: append ? -1 : 0, end: -1, strictIndexing: false }, true)
     }
     nvim.command('setl nomodifiable', true)
@@ -387,8 +405,12 @@ export default class ListUI {
       let height = this.newTab ? workspace.env.lines : this.height
       this.doHighlight(Math.max(0, index - height), Math.min(index + height + 1, this.length - 1))
     }
-    if (!append) window.notify('nvim_win_set_cursor', [[index + 1, 0]])
-    this._onDidChange.fire()
+    if (!append) {
+      this.currIndex = index
+      window.notify('nvim_win_set_cursor', [[index + 1, 0]])
+    }
+    if (!append)
+      this._onDidChange.fire()
     if (workspace.isVim) nvim.command('redraw', true)
     let res = await nvim.resumeNotification()
     if (res[1]) logger.error(res[1])
@@ -442,14 +464,14 @@ export default class ListUI {
   }
 
   public setCursor(lnum: number, col: number): void {
-    let { window, bufnr, items } = this
+    let { window, items } = this
     let max = items.length == 0 ? 1 : items.length
-    if (!bufnr || !window || lnum > max) return
-    window.notify('nvim_win_set_cursor', [[lnum, col]])
+    if (lnum > max) return
     if (this.currIndex + 1 != lnum) {
       this.currIndex = lnum - 1
       this._onDidChangeLine.fire(lnum)
     }
+    if (window) window.notify('nvim_win_set_cursor', [[lnum, col]])
   }
 
   public addHighlights(highlights: ListHighlights[], append = false): void {

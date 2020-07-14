@@ -167,7 +167,7 @@ endfunction
 function! coc#list#options(...)
   let list = ['--top', '--tab', '--normal', '--no-sort', '--input', '--strict',
         \ '--regex', '--interactive', '--number-select', '--auto-preview',
-        \ '--ignore-case']
+        \ '--ignore-case', '--no-quit', '--no-resize', '--first']
   if get(g:, 'coc_enabled', 0)
     let names = coc#rpc#request('listNames', [])
     call extend(list, names)
@@ -189,6 +189,7 @@ function! coc#list#stop_prompt(...)
   endif
   if s:activated
     let s:activated = 0
+    echo ""
     call feedkeys("\u26d4", 'int')
   endif
 endfunction
@@ -210,7 +211,7 @@ function! coc#list#create(position, height, name, numberSelect)
     setl number
   else
     setl nonumber
-    setl foldcolumn=2
+    setl signcolumn=yes
   endif
   return [bufnr('%'), win_getid()]
 endfunction
@@ -228,8 +229,14 @@ function! coc#list#setup(source)
   call setwinvar(winnr(), '&statusline', join(statusParts, ' '))
   setl buftype=nofile nobuflisted nofen nowrap
   setl norelativenumber bufhidden=wipe cursorline winfixheight
-  setl tabstop=1 nolist nocursorcolumn
+  setl tabstop=1 nolist nocursorcolumn undolevels=-1
   setl signcolumn=auto
+  if has('nvim-0.5.0') || has('patch-8.1.0864')
+    setl scrolloff=0
+  endif
+  if exists('&cursorlineopt')
+    setl cursorlineopt=both
+  endif
   setl filetype=list
   setl nospell
   syntax case ignore

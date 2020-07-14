@@ -44,7 +44,7 @@ export default class Outline extends LocationList {
     let ctagsFilestypes = config.get<string[]>('ctagsFilestypes', [])
     let symbols: DocumentSymbol[] | SymbolInformation[] | null
     let args = this.parseArguments(context.args)
-    if (ctagsFilestypes.indexOf(document.filetype) == -1) {
+    if (!ctagsFilestypes.includes(document.filetype)) {
       symbols = await languages.getDocumentSymbol(document.textDocument)
     }
     if (!symbols) return await this.loadCtagsSymbols(document)
@@ -53,7 +53,8 @@ export default class Outline extends LocationList {
     let items: ListItem[] = []
     let isSymbols = !symbols[0].hasOwnProperty('location')
     if (isSymbols) {
-      function addSymbols(allowed_kinds: Array<string>, symbols: DocumentSymbol[], level = 0): void {
+      // eslint-disable-next-line no-inner-declarations
+      function addSymbols(symbols: DocumentSymbol[], level = 0): void {
         symbols.sort(sortSymbols)
         for (let s of symbols) {
           let kind = getSymbolKind(s.kind)
@@ -87,7 +88,7 @@ export default class Outline extends LocationList {
         if (this.allowed_kinds.length != 0 && !this.allowed_kinds.includes(kind))
           continue;
         if (s.name.endsWith(') callback')) continue
-        if (filterKind && kind.toLowerCase().indexOf(filterKind) != 0) {
+        if (filterKind && !kind.toLowerCase().startsWith(filterKind)) {
           continue
         }
         if (s.location.uri === undefined) {
@@ -106,6 +107,7 @@ export default class Outline extends LocationList {
   public doHighlight(): void {
     let { nvim } = this
     nvim.pauseNotification()
+<<<<<<< HEAD
     let _name = this.name;
     _name.charAt(0).toUpperCase;
     nvim.command(`syntax match Coc${_name}Name /\\v^\\s*(\\S+\\s*)+\\ze=\\[/ contained containedin=Coc${_name}Line`, true);
@@ -117,6 +119,15 @@ export default class Outline extends LocationList {
     nvim.resumeNotification().catch(_e => {
       // noop
     })
+=======
+    nvim.command('syntax match CocOutlineName /\\v^\\s*[^\t]+/ contained containedin=CocOutlineLine', true)
+    nvim.command('syntax match CocOutlineKind /\\[\\w\\+\\]/ contained containedin=CocOutlineLine', true)
+    nvim.command('syntax match CocOutlineLine /\\d\\+$/ contained containedin=CocOutlineLine', true)
+    nvim.command('highlight default link CocOutlineName Normal', true)
+    nvim.command('highlight default link CocOutlineKind Typedef', true)
+    nvim.command('highlight default link CocOutlineLine Comment', true)
+    nvim.resumeNotification(false, true).logError()
+>>>>>>> c250e18604ff8082b9cf142f91f60aba20333c36
   }
 
   public async loadCtagsSymbols(document: Document): Promise<ListItem[]> {
@@ -158,9 +169,7 @@ export default class Outline extends LocationList {
         data: { line: lnum }
       })
     }
-    items.sort((a, b) => {
-      return a.data.line - b.data.line
-    })
+    items.sort((a, b) => a.data.line - b.data.line)
     return items
   }
 }

@@ -28,7 +28,7 @@ export default class Cursors {
   private winid: number
   private matchIds: number[] = []
   private textDocument: TextDocument
-  private version = -1
+  private changing = false
   private config: Config
   constructor(private nvim: Neovim) {
     this.loadConfig()
@@ -140,7 +140,7 @@ export default class Cursors {
     this.textDocument = doc.textDocument
     workspace.onDidChangeTextDocument(async e => {
       if (e.textDocument.uri != doc.uri) return
-      if (doc.version - this.version == 1 || !this.ranges.length) return
+      if (this.changing || !this.ranges.length) return
       let change = e.contentChanges[0]
       if (!('range' in change)) return
       let { original } = e
@@ -241,7 +241,7 @@ export default class Cursors {
     disposeAll(this.disposables)
     this._changed = false
     this.ranges = []
-    this.version = -1
+    this.changing = false
     this._activated = false
   }
 
@@ -312,7 +312,7 @@ export default class Cursors {
   private getTextRange(range: Range, text: string): TextRange | null {
     let { ranges } = this
     // can't support line count change
-    if (text.indexOf('\n') !== -1 || range.start.line != range.end.line) return null
+    if (text.includes('\n') || range.start.line != range.end.line) return null
     ranges.sort((a, b) => {
       if (a.line != b.line) return a.line - b.line
       return a.currRange.start.character - b.currRange.start.character
@@ -356,7 +356,7 @@ export default class Cursors {
       }
     }
     let { nvim } = this
-    this.version = doc.version
+    this.changing = true
     // apply changes
     nvim.pauseNotification()
     nvim.command('undojoin', true)
@@ -367,7 +367,9 @@ export default class Cursors {
       nvim.call('cursor', [cursor.lnum, cursor.col + changed], true)
     }
     this.doHighlights()
+    if (workspace.isNvim) nvim.command('redraw', true)
     let [, err] = await nvim.resumeNotification()
+    this.changing = false
     if (err) logger.error(err)
   }
 
@@ -399,7 +401,7 @@ export default class Cursors {
         edits.push({ range: Range.create(pos, pos), newText: diff[1] })
       }
     }
-    if (edits.some(edit => edit.newText.indexOf('\n') != -1 || edit.range.start.line != edit.range.end.line)) {
+    if (edits.some(edit => edit.newText.includes('\n') || edit.range.start.line != edit.range.end.line)) {
       this.cancel()
       return
     }
@@ -480,13 +482,13 @@ export default class Cursors {
       if (isEnd) {
         if (textRange.currRange.start.character == range.start.character) {
           // changed both start and end
-          if (text.indexOf(textRange.text) !== -1) {
+          if (text.includes(textRange.text)) {
             let idx = text.indexOf(textRange.text)
             let pre = idx == 0 ? '' : text.slice(0, idx)
             let post = text.slice(idx + textRange.text.length)
             if (pre) ranges.forEach(r => r.add(0, pre))
             if (post) ranges.forEach(r => r.add(r.text.length, post))
-          } else if (textRange.text.indexOf(text) !== -1) {
+          } else if (textRange.text.includes(text)) {
             // delete
             let idx = textRange.text.indexOf(text)
             let offset = textRange.text.length - (idx + text.length)

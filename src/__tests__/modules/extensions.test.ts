@@ -5,14 +5,12 @@ import events from '../../events'
 import extensions, { API } from '../../extensions'
 import { Extension } from '../../types'
 import helper from '../helper'
-import uuidv1 = require('uuid/v1')
+import { v1 as uuidv1 } from 'uuid'
 
 let nvim: Neovim
 beforeAll(async () => {
   await helper.setup()
   nvim = helper.nvim
-  let folder = path.join(__dirname, '../extensions/test')
-  await extensions.loadExtension(folder)
 })
 
 afterAll(async () => {
@@ -28,30 +26,36 @@ describe('extensions', () => {
     expect(stat).toBe('activated')
   })
 
+  it('should filter global extensions', async () => {
+    let res = extensions.filterGlobalExtensions(['test', 'foo'])
+    expect(res).toEqual(['foo'])
+  })
+
   it('should load local extensions from &rtp', async () => {
-    let folder = path.resolve(__dirname, '../extensions/local')
+    let folder = path.resolve(__dirname, '../extensions/vim/local')
     await nvim.command(`set runtimepath^=${folder}`)
-    await helper.wait(200)
+    await helper.wait(300)
     let stat = extensions.getExtensionState('local')
     expect(stat).toBe('activated')
   })
 
-  it('should install/uninstall extension', async () => {
+  it('should install/uninstall npm extension', async () => {
     await extensions.installExtensions(['coc-omni'])
-    let folder = path.join(__dirname, '../extensions/node_modules/coc-omni')
+    let folder = path.join(__dirname, '../extensions/coc-omni')
     let exists = fs.existsSync(folder)
     expect(exists).toBe(true)
+    await helper.wait(200)
     await extensions.uninstallExtension(['coc-omni'])
     exists = fs.existsSync(folder)
     expect(exists).toBe(false)
   })
 
   it('should install/uninstall extension by url', async () => {
-    await extensions.installExtensions(['https://github.com/dsznajder/vscode-es7-javascript-react-snippets'])
-    let folder = path.join(__dirname, '../extensions/node_modules/es7-react-js-snippets')
+    await extensions.installExtensions(['https://github.com/hollowtree/vscode-vue-snippets'])
+    let folder = path.join(__dirname, '../extensions/vue-snippets')
     let exists = fs.existsSync(folder)
     expect(exists).toBe(true)
-    await extensions.uninstallExtension(['es7-react-js-snippets'])
+    await extensions.uninstallExtension(['vue-snippets'])
     exists = fs.existsSync(folder)
     expect(exists).toBe(false)
   })
@@ -92,10 +96,10 @@ describe('extensions', () => {
   })
 
   it('should activate & deactivate extension', async () => {
-    extensions.deactivate('test')
+    await extensions.deactivate('test')
     let stat = extensions.getExtensionState('test')
     expect(stat).toBe('loaded')
-    extensions.activate('test')
+    await extensions.activate('test')
     stat = extensions.getExtensionState('test')
     expect(stat).toBe('activated')
   })
@@ -110,6 +114,12 @@ describe('extensions', () => {
   it('should get extension API', () => {
     let res = extensions.getExtensionApi('test') as any
     expect(typeof res.echo).toBe('function')
+  })
+
+  it('should load single file extension', async () => {
+    let filepath = path.join(__dirname, '../extensions/root.js')
+    await extensions.loadExtensionFile(filepath)
+    expect(extensions.has('single-root')).toBe(true)
   })
 })
 
@@ -132,9 +142,7 @@ describe('extensions active events', () => {
       }
     } as any
     Object.defineProperty(ext, 'isActive', {
-      get: () => {
-        return isActive
-      }
+      get: () => isActive
     })
     extensions.registerExtension(ext, () => {
       isActive = false
@@ -184,10 +192,10 @@ describe('extension properties', () => {
     expect(p.endsWith('test')).toBe(true)
   })
 
-  it('should deactivate', () => {
+  it('should deactivate', async () => {
     let ext = extensions.getExtension('test')
-    ext.deactivate()
+    await ext.deactivate()
     expect(ext.extension.isActive).toBe(false)
-    extensions.activate('test')
+    await extensions.activate('test')
   })
 })

@@ -1,10 +1,10 @@
 import { Disposable } from 'vscode-languageserver-protocol'
 import { NeovimClient as Neovim } from '@chemzqm/neovim'
 import { StatusBarItem } from '../types'
-import uuidv1 = require('uuid/v1')
+import { v1 as uuidv1 } from 'uuid'
 const logger = require('../util/logger')('model-status')
 
-const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+export const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 export default class StatusLine implements Disposable {
   private items: Map<string, StatusBarItem> = new Map()

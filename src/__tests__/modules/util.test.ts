@@ -1,30 +1,16 @@
-/* tslint:disable:no-console */
-import { Neovim } from '@chemzqm/neovim'
 import path from 'path'
-import rimraf from 'rimraf'
 import { URI } from 'vscode-uri'
 import os from 'os'
-import { mkdirp } from '../../util'
 import { isGitIgnored, findUp, resolveRoot, statAsync, parentDirs, isParentFolder } from '../../util/fs'
 import { fuzzyChar, fuzzyMatch, getCharCodes } from '../../util/fuzzy'
 import { score, positions } from '../../util/fzy'
-import { getHiglights } from '../../util/highlight'
 import { score as matchScore } from '../../util/match'
 import { mixin } from '../../util/object'
 import { Mutex } from '../../util/mutex'
 import { indexOf } from '../../util/string'
 import helper from '../helper'
 import { ansiparse } from '../../util/ansiparse'
-
-let nvim: Neovim
-beforeAll(async () => {
-  await helper.setup()
-  nvim = helper.nvim
-})
-
-afterAll(async () => {
-  await helper.shutdown()
-})
+import { concurrent } from '../../util'
 
 describe('score test', () => {
   test('should match schema', () => {
@@ -42,15 +28,6 @@ describe('score test', () => {
   test('fzy#positions', async () => {
     let arr = positions("amuser", "app/models/user.rb")
     expect(arr).toEqual([0, 4, 11, 12, 13, 14])
-  })
-})
-
-describe('mkdirp', () => {
-  test('should mkdirp', async () => {
-    let dir = path.join(__dirname, 'a/b/c')
-    let res = await mkdirp(dir)
-    expect(res).toBe(true)
-    rimraf.sync(path.join(__dirname, 'a'))
   })
 })
 
@@ -74,6 +51,27 @@ describe('string test', () => {
   test('should find index', () => {
     expect(indexOf('a,b,c', ',', 2)).toBe(3)
     expect(indexOf('a,b,c', ',', 1)).toBe(1)
+  })
+})
+
+describe('concurrent', () => {
+  test('should run concurrent', async () => {
+    let res: number[] = []
+    let fn = (n: number): Promise<void> => {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          res.push(n)
+          resolve()
+        }, n * 100)
+      })
+    }
+    let arr = [5, 4, 3, 6, 8]
+    let ts = Date.now()
+    await concurrent(arr, fn, 3)
+    let dt = Date.now() - ts
+    expect(dt).toBeLessThanOrEqual(1300)
+    expect(dt).toBeGreaterThanOrEqual(1200)
+    expect(res).toEqual([3, 4, 5, 6, 8])
   })
 })
 
@@ -165,19 +163,6 @@ describe('findUp', () => {
   })
 })
 
-describe('getHiglights', () => {
-  test('getHiglights', async () => {
-    let res = await getHiglights([
-      '*@param* `buffer`'
-    ], 'markdown')
-    expect(res.length > 0).toBe(true)
-    for (let filetype of ['Error', 'Warning', 'Info', 'Hint']) {
-      let res = await getHiglights(['foo'], filetype)
-      expect(res.length > 0).toBe(true)
-    }
-  })
-})
-
 describe('ansiparse', () => {
   test('ansiparse #1', () => {
     let str = '\u001b[33mText\u001b[mnormal'
@@ -210,18 +195,16 @@ describe('ansiparse', () => {
 describe('Mutex', () => {
   test('mutex run in serial', async () => {
     let lastTs: number
-    let fn = () => {
-      return new Promise(resolve => {
-        if (lastTs) {
-          let dt = Date.now() - lastTs
-          expect(dt).toBeGreaterThanOrEqual(300)
-        }
-        lastTs = Date.now()
-        setTimeout(() => {
-          resolve()
-        }, 300)
-      })
-    }
+    let fn = () => new Promise<void>(resolve => {
+      if (lastTs) {
+        let dt = Date.now() - lastTs
+        expect(dt).toBeGreaterThanOrEqual(298)
+      }
+      lastTs = Date.now()
+      setTimeout(() => {
+        resolve()
+      }, 300)
+    })
     let mutex = new Mutex()
     await Promise.all([
       mutex.use(fn),
@@ -232,14 +215,12 @@ describe('Mutex', () => {
 
   test('mutex run after job finish', async () => {
     let count = 0
-    let fn = () => {
-      return new Promise(resolve => {
-        count = count + 1
-        setTimeout(() => {
-          resolve()
-        }, 100)
-      })
-    }
+    let fn = () => new Promise<void>(resolve => {
+      count = count + 1
+      setTimeout(() => {
+        resolve()
+      }, 100)
+    })
     let mutex = new Mutex()
     await mutex.use(fn)
     await helper.wait(10)

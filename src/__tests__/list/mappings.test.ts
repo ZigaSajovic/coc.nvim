@@ -63,14 +63,14 @@ const lineList: IList = {
     for (let i = 0; i < 100; i++) {
       lines.push(i.toString())
     }
-    return lines.map((line, idx) => {
-      return {
-        label: line,
-        data: { line: idx }
-      }
-    })
+    return lines.map((line, idx) => ({
+      label: line,
+      data: { line: idx }
+    }))
   }
 }
+
+jest.setTimeout(5000)
 
 beforeAll(async () => {
   await helper.setup()
@@ -165,13 +165,13 @@ describe('list insert mappings', () => {
   it('should move cursor by <PageUp> and <PageDown>', async () => {
     let disposable = manager.registerList(lineList)
     await manager.start(['lines'])
-    await helper.wait(60)
+    await helper.wait(100)
     await nvim.eval('feedkeys("\\<PageDown>", "in")')
-    await helper.wait(60)
+    await helper.wait(100)
     let line = await nvim.eval('line(".")')
     expect(line).toBeGreaterThan(1)
     await nvim.eval('feedkeys("\\<PageUp>", "in")')
-    await helper.wait(60)
+    await helper.wait(100)
     disposable.dispose()
   })
 
@@ -439,7 +439,7 @@ describe('User mappings', () => {
       '<C-x>': 'do:defaultaction',
       '<C-h>': 'do:help',
       '<C-d>': 'do:exit',
-      '<C-m>': 'do:toggleMode',
+      '<C-b>': 'do:toggleMode',
     })
     await manager.start(['location'])
     await helper.wait(200)
@@ -467,14 +467,6 @@ describe('User mappings', () => {
     await nvim.eval('feedkeys("\\<C-q>", "in")')
     await helper.wait(30)
     expect(manager.isActivated).toBe(false)
-    let winnr = await nvim.call('winnr')
-    expect(winnr > 1).toBe(true)
-    await manager.start(['location'])
-    await nvim.eval('feedkeys("\\<C-m>", "in")')
-    await helper.wait(30)
-    expect(manager.isActivated).toBe(true)
-    let line = await helper.getCmdline()
-    expect(line).toBe('')
     await manager.start(['location'])
     await nvim.eval('feedkeys("?", "in")')
     await helper.wait(30)
@@ -484,6 +476,12 @@ describe('User mappings', () => {
     await nvim.eval('feedkeys("\\<C-d>", "in")')
     await helper.wait(30)
     expect(manager.isActivated).toBe(false)
+    await manager.start(['location'])
+    await nvim.eval('feedkeys("\\<C-b>", "in")')
+    await helper.wait(100)
+    expect(manager.isActivated).toBe(true)
+    let line = await helper.getCmdline()
+    expect(line).toBe('')
   })
 
   it('should execute prompt mappings', async () => {
@@ -590,9 +588,7 @@ describe('User mappings', () => {
     clipboardy.write = async val => {
       text = val
     }
-    clipboardy.read = async () => {
-      return text
-    }
+    clipboardy.read = async () => text
     await clipboardy.write('foo')
     await manager.start(['location'])
     await helper.wait(100)

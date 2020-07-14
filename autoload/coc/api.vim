@@ -332,6 +332,9 @@ function! s:funcs.buf_get_lines(bufnr, start, end, strict) abort
 endfunction
 
 function! s:funcs.buf_set_lines(bufnr, start, end, strict, ...) abort
+  if !bufloaded(a:bufnr)
+    return
+  endif
   let replacement = get(a:, 1, [])
   let lineCount = s:buf_line_count(a:bufnr)
   let startLnum = a:start >= 0 ? a:start + 1 : lineCount + a:start + 1
@@ -346,9 +349,9 @@ function! s:funcs.buf_set_lines(bufnr, start, end, strict, ...) abort
     let changeBuffer = 1
     exe 'buffer '.a:bufnr
   endif
-  let storeView = winsaveview()
   if a:bufnr == curr || changeBuffer
     " replace
+    let storeView = winsaveview()
     if delCount == len(replacement)
       call setline(startLnum, replacement)
     else
@@ -382,7 +385,6 @@ function! s:funcs.buf_set_lines(bufnr, start, end, strict, ...) abort
         call deletebufline(a:bufnr, start, start + delCount - 1)
       endif
     endif
-    call winrestview(storeView)
   endif
 endfunction
 
@@ -455,6 +457,13 @@ function! s:funcs.win_set_width(win_id, width) abort
   let winid = win_getid()
   call win_gotoid(a:win_id)
   execute 'vertical resize '.a:width
+  call win_gotoid(winid)
+endfunction
+
+function! s:funcs.win_set_buf(win_id, buf_id) abort
+  let winid = win_getid()
+  call win_gotoid(a:win_id)
+  execute 'buffer '.a:buf_id
   call win_gotoid(winid)
 endfunction
 

@@ -2,7 +2,7 @@ import { CancellationToken, CodeLens, Disposable, DocumentSelector } from 'vscod
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CodeLensProvider } from './index'
 import Manager, { ProviderItem } from './manager'
-import uuid = require('uuid/v4')
+import { v4 as uuid } from 'uuid'
 import { omit } from '../util/lodash'
 // const logger = require('../util/logger')('codeActionManager')
 
@@ -49,7 +49,6 @@ export default class CodeLensManager extends Manager<CodeLensProvider> implement
     let { source } = codeLens as any
     let provider = this.poviderById(source)
     if (!provider || typeof provider.resolveCodeLens != 'function') {
-      // tslint:disable-next-line:no-console
       console.error(`CodeLens Resolve not supported`)
       return codeLens
     }

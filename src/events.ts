@@ -1,24 +1,25 @@
 import { Disposable } from 'vscode-languageserver-protocol'
-import { PopupChangeEvent, VimCompleteItem } from './types'
+import { PopupChangeEvent, InsertChange, VimCompleteItem } from './types'
 import { disposeAll } from './util'
+import { equals } from './util/object'
 const logger = require('./util/logger')('events')
 
 export type Result = void | Promise<void>
 
-export type BufEvents = 'TextChangedI' | 'BufHidden' | 'BufEnter' | 'TextChanged'
-  | 'BufWritePost' | 'CursorHold' | 'InsertLeave' | 'TermOpen' | 'TermClose' | 'InsertEnter'
-  | 'BufCreate' | 'BufUnload' | 'BufWritePre' | 'CursorHoldI' | 'TextChangedP' | 'Enter'
+export type BufEvents = 'BufHidden' | 'BufEnter' | 'BufWritePost'
+  | 'CursorHold' | 'InsertLeave' | 'TermOpen' | 'TermClose' | 'InsertEnter'
+  | 'BufCreate' | 'BufUnload' | 'BufWritePre' | 'CursorHoldI' | 'Enter'
 
 export type EmptyEvents = 'FocusGained' | 'VimLeave'
 
-export type TextChangedEvent = 'TextChanged'
+export type InsertChangeEvents = 'TextChangedP' | 'TextChangedI'
 
 export type TaskEvents = 'TaskExit' | 'TaskStderr' | 'TaskStdout'
 
-export type AllEvents = BufEvents | EmptyEvents | MoveEvents | TaskEvents |
-  'CompleteDone' | 'MenuPopupChanged' | 'InsertCharPre' | 'FileType' |
-  'BufWinEnter' | 'BufWinLeave' | 'VimResized' | 'DirChanged' | 'OptionSet' |
-  'Command' | 'BufReadCmd' | 'GlobalChange' | 'InputChar'
+export type AllEvents = BufEvents | EmptyEvents | MoveEvents | TaskEvents
+  | InsertChangeEvents | 'CompleteDone' | 'TextChanged' | 'MenuPopupChanged'
+  | 'InsertCharPre' | 'FileType' | 'BufWinEnter' | 'BufWinLeave' | 'VimResized'
+  | 'DirChanged' | 'OptionSet' | 'Command' | 'BufReadCmd' | 'GlobalChange' | 'InputChar'
 
 export type MoveEvents = 'CursorMoved' | 'CursorMovedI'
 
@@ -56,21 +57,21 @@ class Events {
       await this.fire('InsertLeave', [args[0]])
     }
     if (event == 'CursorMoved' || event == 'CursorMovedI') {
-      this._cursor = {
+      let cursor = {
         bufnr: args[0],
         lnum: args[1][0],
         col: args[1][1],
         insert: event == 'CursorMovedI'
       }
+      // not handle CursorMoved when it's not moved at all
+      if (this._cursor && equals(this._cursor, cursor)) return
+      this._cursor = cursor
     }
     if (cbs) {
       try {
-        await Promise.all(cbs.map(fn => {
-          return fn(args)
-        }))
+        await Promise.all(cbs.map(fn => fn(args)))
       } catch (e) {
-        if (e.message) {
-          // tslint:disable-next-line: no-console
+        if (e.message && e.message.indexOf('transport disconnected') == -1) {
           console.error(`Error on ${event}: ${e.message}${e.stack ? '\n' + e.stack : ''} `)
         }
         logger.error(`Handler Error on ${event}`, e.stack)
@@ -81,7 +82,8 @@ class Events {
   public on(event: EmptyEvents | AllEvents[], handler: () => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: BufEvents, handler: (bufnr: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: MoveEvents, handler: (bufnr: number, cursor: [number, number]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
-  public on(event: TextChangedEvent, handler: (bufnr: number, changedtick: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
+  public on(event: InsertChangeEvents, handler: (bufnr: number, info: InsertChange) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
+  public on(event: 'TextChanged', handler: (bufnr: number, changedtick: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'TaskExit', handler: (id: string, code: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'TaskStderr' | 'TaskStdout', handler: (id: string, lines: string[]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'BufReadCmd', handler: (scheme: string, fullpath: string) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
@@ -106,23 +108,24 @@ class Events {
       })
     } else {
       let arr = this.handlers.get(event) || []
-      let limit = 1000
       let stack = Error().stack
-      arr.push(args => {
-        return new Promise(async (resolve, reject) => {
-          let timer = setTimeout(() => {
-            logger.warn(`Handler of ${event} cost more than 1s`, stack)
-          }, limit)
-          try {
-            await Promise.resolve(handler.apply(thisArg || null, args))
-            clearTimeout(timer)
+      arr.push(args => new Promise((resolve, reject) => {
+        let timer
+        try {
+          Promise.resolve(handler.apply(thisArg || null, args)).then(() => {
+            if (timer) clearTimeout(timer)
             resolve()
-          } catch (e) {
-            clearTimeout(timer)
+          }, e => {
+            if (timer) clearTimeout(timer)
             reject(e)
-          }
-        })
-      })
+          })
+          timer = setTimeout(() => {
+            logger.warn(`Handler of ${event} blocked more than 2s:`, stack)
+          }, 2000)
+        } catch (e) {
+          reject(e)
+        }
+      }))
       this.handlers.set(event, arr)
       let disposable = Disposable.create(() => {
         let idx = arr.indexOf(handler)

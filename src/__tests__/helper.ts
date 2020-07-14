@@ -9,7 +9,7 @@ import attach from '../attach'
 import Document from '../model/document'
 import Plugin from '../plugin'
 import workspace from '../workspace'
-import uuid from 'uuid/v4'
+import { v4 as uuid } from 'uuid'
 import { VimCompleteItem } from '../types'
 
 export interface CursorPosition {
@@ -20,7 +20,6 @@ export interface CursorPosition {
 
 process.on('uncaughtException', err => {
   let msg = 'Uncaught exception: ' + err.stack
-  // tslint:disable-next-line: no-console
   console.error(msg)
 })
 export class Helper extends Emitter {
@@ -60,7 +59,7 @@ export class Helper extends Emitter {
   }
 
   public async shutdown(): Promise<void> {
-    await this.plugin.dispose()
+    this.plugin.dispose()
     await this.nvim.quit()
     if (this.proc) {
       this.proc.kill('SIGKILL')

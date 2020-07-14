@@ -129,7 +129,6 @@ export class CommandManager implements Disposable {
     this.register({
       id: 'workspace.clearWatchman',
       execute: async () => {
-        if (process.env.NODE_ENV === 'test') return
         await workspace.runCommand('watchman watch-del-all')
       }
     }, false, 'run watch-del-all for watchman to free up memory.')
@@ -163,9 +162,7 @@ export class CommandManager implements Disposable {
     }, false, 'toggle auto update of extensions.')
     this.register({
       id: 'workspace.diagnosticRelated',
-      execute: () => {
-        return diagnosticManager.jumpRelated()
-      }
+      execute: () => diagnosticManager.jumpRelated()
     }, false, 'jump to related locations of current diagnostic.')
     this.register({
       id: 'workspace.showOutput',
@@ -238,6 +235,30 @@ export class CommandManager implements Disposable {
         await workspace.moveTo(ranges[0].start)
       }
     }, false, 'Jump to next symbol highlight position.')
+    this.register({
+      id: 'document.jumpToPrevSymbol',
+      execute: async () => {
+        let doc = await workspace.document
+        if (!doc) return
+        let ranges = await plugin.cocAction('symbolRanges') as Range[]
+        if (!ranges) return
+        let { textDocument } = doc
+        let offset = await workspace.getOffset()
+        ranges.sort((a, b) => {
+          if (a.start.line != b.start.line) {
+            return a.start.line - b.start.line
+          }
+          return a.start.character - b.start.character
+        })
+        for (let i = ranges.length - 1; i >= 0; i--) {
+          if (textDocument.offsetAt(ranges[i].end) < offset) {
+            await workspace.moveTo(ranges[i].start)
+            return
+          }
+        }
+        await workspace.moveTo(ranges[ranges.length - 1].start)
+      }
+    }, false, 'Jump to previous symbol highlight position.')
   }
 
   public get commandList(): CommandItem[] {
@@ -294,7 +315,7 @@ export class CommandManager implements Disposable {
    * @return Disposable which unregisters this command on disposal.
    */
   public registerCommand(id: string, impl: (...args: any[]) => void, thisArg?: any, internal = false): Disposable {
-    if (/^_/.test(id)) internal = true
+    if (id.startsWith("_")) internal = true
     this.commands.set(id, new CommandItem(id, impl, thisArg, internal))
     return Disposable.create(() => {
       this.commands.delete(id)

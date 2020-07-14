@@ -1,11 +1,23 @@
 
 export function intersect<T>(array: T[], other: T[]): boolean {
   for (let item of other) {
-    if (array.indexOf(item) !== -1) {
+    if (array.includes(item)) {
       return true
     }
   }
   return false
+}
+
+export function splitArray<T>(array: T[], fn: (item: T) => boolean): [T[], T[]] {
+  let res: [T[], T[]] = [[], []]
+  for (let item of array) {
+    if (fn(item)) {
+      res[0].push(item)
+    } else {
+      res[1].push(item)
+    }
+  }
+  return res
 }
 
 export function tail<T>(array: T[], n = 0): T {
@@ -27,9 +39,7 @@ export function group<T>(array: T[], size: number): T[][] {
  */
 export function distinct<T>(array: T[], keyFn?: (t: T) => string): T[] {
   if (!keyFn) {
-    return array.filter((element, position) => {
-      return array.indexOf(element) === position
-    })
+    return array.filter((element, position) => array.indexOf(element) === position)
   }
 
   const seen: { [key: string]: boolean } = Object.create(null)

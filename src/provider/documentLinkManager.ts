@@ -2,7 +2,7 @@ import { CancellationToken, Disposable, DocumentLink, DocumentSelector } from 'v
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { DocumentLinkProvider } from './index'
 import Manager, { ProviderItem } from './manager'
-import uuid = require('uuid/v4')
+import { v4 as uuid } from 'uuid'
 
 export default class DocumentLinkManager extends Manager<DocumentLinkProvider> implements Disposable {
 
@@ -32,9 +32,7 @@ export default class DocumentLinkManager extends Manager<DocumentLinkProvider> i
   public async provideDocumentLinks(document: TextDocument, token: CancellationToken): Promise<DocumentLink[]> {
     let items = this.getProviders(document)
     if (items.length == 0) return []
-    const arr = await Promise.all(items.map(item => {
-      return this._provideDocumentLinks(item, document, token)
-    }))
+    const arr = await Promise.all(items.map(item => this._provideDocumentLinks(item, document, token)))
     return [].concat(...arr)
   }
 

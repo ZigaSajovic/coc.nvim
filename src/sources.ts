@@ -24,13 +24,13 @@ export class Sources {
     return workspace.nvim
   }
 
-  private async createNativeSources(): Promise<void> {
+  private createNativeSources(): void {
     try {
       this.disposables.push((require('./source/around')).regist(this.sourceMap))
       this.disposables.push((require('./source/buffer')).regist(this.sourceMap))
       this.disposables.push((require('./source/file')).regist(this.sourceMap))
     } catch (e) {
-      console.error('Create source error:' + e.message) // tslint:disable-line
+      console.error('Create source error:' + e.message)
     }
   }
 
@@ -40,7 +40,7 @@ export class Sources {
       await nvim.command(`source ${filepath}`)
       let fns = await nvim.call('coc#util#remote_fns', name) as string[]
       for (let fn of ['init', 'complete']) {
-        if (fns.indexOf(fn) == -1) {
+        if (!fns.includes(fn)) {
           workspace.showMessage(`${fn} not found for source ${name}`, 'error')
           return null
         }
@@ -99,7 +99,7 @@ export class Sources {
         name,
         filepath,
         sourceType: SourceType.Remote,
-        optionalFns: fns.filter(n => ['init', 'complete'].indexOf(n) == -1)
+        optionalFns: fns.filter(n => !['init', 'complete'].includes(n))
       })
       let isActive = false
       let extension: any = {
@@ -107,15 +107,14 @@ export class Sources {
         packageJSON,
         exports: void 0,
         extensionPath: filepath,
-        activate: async () => {
+        activate: () => {
           isActive = true
           this.addSource(source)
+          return Promise.resolve()
         }
       }
       Object.defineProperty(extension, 'isActive', {
-        get: () => {
-          return isActive
-        }
+        get: () => isActive
       })
       extensions.registerExtension(extension, () => {
         isActive = false
@@ -126,33 +125,31 @@ export class Sources {
     }
   }
 
-  private async createRemoteSources(): Promise<void> {
+  private createRemoteSources(): void {
     let { runtimepath } = workspace.env
     let paths = runtimepath.split(',')
     for (let path of paths) {
-      await this.createVimSources(path)
+      this.createVimSources(path).logError()
     }
   }
 
   private async createVimSources(pluginPath: string): Promise<void> {
-    if (this.remoteSourcePaths.indexOf(pluginPath) != -1) return
+    if (this.remoteSourcePaths.includes(pluginPath)) return
     this.remoteSourcePaths.push(pluginPath)
     let folder = path.join(pluginPath, 'autoload/coc/source')
     let stat = await statAsync(folder)
     if (stat && stat.isDirectory()) {
       let arr = await util.promisify(fs.readdir)(folder)
-      arr = arr.filter(s => s.slice(-4) == '.vim')
+      arr = arr.filter(s => s.endsWith('.vim'))
       let files = arr.map(s => path.join(folder, s))
       if (files.length == 0) return
-      await Promise.all(files.map(p => {
-        return this.createVimSourceExtension(this.nvim, p)
-      }))
+      await Promise.all(files.map(p => this.createVimSourceExtension(this.nvim, p)))
     }
   }
 
   public init(): void {
-    this.createNativeSources() // tslint:disable-line
-    this.createRemoteSources() // tslint:disable-line
+    this.createNativeSources()
+    this.createRemoteSources()
     events.on('BufEnter', this.onDocumentEnter, this, this.disposables)
     workspace.watchOption('runtimepath', async (oldValue, newValue) => {
       let result = fastDiff(oldValue, newValue)
@@ -215,25 +212,34 @@ export class Sources {
   public getCompleteSources(opt: CompleteOption): ISource[] {
     let { filetype } = opt
     let pre = byteSlice(opt.line, 0, opt.colnr - 1)
-    let isTriggered = opt.input == '' && opt.triggerCharacter
+    let isTriggered = opt.input == '' && !!opt.triggerCharacter
     if (isTriggered) return this.getTriggerSources(pre, filetype)
-    let character = pre.length ? pre[pre.length - 1] : ''
+    return this.getNormalSources(opt.filetype)
+  }
+
+  /**
+   * Get sources should be used without trigger.
+   *
+   * @param {string} filetype
+   * @returns {ISource[]}
+   */
+  public getNormalSources(filetype: string): ISource[] {
     return this.sources.filter(source => {
       let { filetypes, triggerOnly, enable } = source
-      if (!enable || (filetypes && filetypes.indexOf(filetype) == -1)) {
+      if (!enable || triggerOnly || (filetypes && !filetypes.includes(filetype))) {
         return false
       }
-      if (triggerOnly && !this.checkTrigger(source, pre, character)) {
+      if (this.disabledByLanguageId(source, filetype)) {
         return false
       }
       return true
     })
   }
 
-  public checkTrigger(source: ISource, pre: string, character: string): boolean {
+  private checkTrigger(source: ISource, pre: string, character: string): boolean {
     let { triggerCharacters, triggerPatterns } = source
     if (!triggerCharacters && !triggerPatterns) return false
-    if (character && triggerCharacters && triggerCharacters.indexOf(character) !== -1) {
+    if (character && triggerCharacters && triggerCharacters.includes(character)) {
       return true
     }
     if (triggerPatterns && triggerPatterns.findIndex(p => p.test(pre)) !== -1) {
@@ -243,44 +249,26 @@ export class Sources {
   }
 
   public shouldTrigger(pre: string, languageId: string): boolean {
-    let last = pre.length ? pre[pre.length - 1] : ''
-    let idx = this.sources.findIndex(s => {
-      let { enable, triggerCharacters, triggerPatterns, filetypes } = s
-      if (!enable || (filetypes && filetypes.indexOf(languageId) == -1)) return false
-      if (last && triggerCharacters) return triggerCharacters.indexOf(last) !== -1
-      if (triggerPatterns) return triggerPatterns.findIndex(p => p.test(pre)) !== -1
-      return false
-    })
-    return idx !== -1
+    let sources = this.getTriggerSources(pre, languageId)
+    return sources.length > 0
   }
 
   public getTriggerSources(pre: string, languageId: string): ISource[] {
     let character = pre.length ? pre[pre.length - 1] : ''
+    if (!character) return []
     return this.sources.filter(source => {
       let { filetypes, enable } = source
-      if (!enable || (filetypes && filetypes.indexOf(languageId) == -1)) {
+      if (!enable || (filetypes && !filetypes.includes(languageId))) {
         return false
       }
+      if (this.disabledByLanguageId(source, languageId)) return false
       return this.checkTrigger(source, pre, character)
-    })
-  }
-
-  public getSourcesForFiletype(filetype: string, isTriggered: boolean): ISource[] {
-    return this.sources.filter(source => {
-      let { filetypes } = source
-      if (source.triggerOnly && isTriggered === false) {
-        return false
-      }
-      if (source.enable && (!filetypes || filetypes.indexOf(filetype) !== -1)) {
-        return true
-      }
-      return false
     })
   }
 
   public addSource(source: ISource): Disposable {
     let { name } = source
-    if (this.names.indexOf(name) !== -1) {
+    if (this.names.includes(name)) {
       workspace.showMessage(`Source "${name}" recreated`, 'warning')
     }
     this.sourceMap.set(name, source)
@@ -322,6 +310,7 @@ export class Sources {
       res.push({
         name: item.name,
         priority: item.priority,
+        triggerCharacters: item.triggerCharacters || [],
         shortcut: item.shortcut || '',
         filetypes: item.filetypes || [],
         filepath: item.filepath || '',
@@ -346,12 +335,17 @@ export class Sources {
 
   public createSource(config: SourceConfig): Disposable {
     if (!config.name || !config.doComplete) {
-      // tslint:disable-next-line: no-console
       console.error(`name and doComplete required for createSource`)
       return
     }
     let source = new Source(Object.assign({ sourceType: SourceType.Service } as any, config))
     return this.addSource(source)
+  }
+
+  private disabledByLanguageId(source: ISource, languageId: string): boolean {
+    let map = workspace.env.disabledSources
+    let list = map ? map[languageId] : []
+    return Array.isArray(list) && list.includes(source.name)
   }
 
   public dispose(): void {

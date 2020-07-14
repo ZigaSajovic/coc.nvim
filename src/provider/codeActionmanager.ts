@@ -2,7 +2,8 @@ import { CancellationToken, CodeAction, CodeActionContext, CodeActionKind, Comma
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CodeActionProvider } from './index'
 import Manager, { ProviderItem } from './manager'
-import uuid = require('uuid/v4')
+import { v4 as uuid } from 'uuid'
+import { intersect } from '../util/array'
 const logger = require('../util/logger')('codeActionManager')
 
 export default class CodeActionManager extends Manager<CodeActionProvider> implements Disposable {
@@ -32,7 +33,7 @@ export default class CodeActionManager extends Manager<CodeActionProvider> imple
     if (context.only) {
       let { only } = context
       providers = providers.filter(p => {
-        if (p.kinds && !p.kinds.some(kind => only.indexOf(kind) != -1)) {
+        if (p.kinds && !p.kinds.some(kind => only.includes(kind))) {
           return false
         }
         return true
@@ -50,7 +51,13 @@ export default class CodeActionManager extends Manager<CodeActionProvider> imple
             codeActions.push(CodeAction.create(action.title, action))
           } else {
             if (context.only) {
-              if (!action.kind || context.only.indexOf(action.kind) == -1) {
+              if (!action.kind) continue
+              let { only } = context
+              if (intersect(only, [CodeActionKind.Source, CodeActionKind.Refactor])) {
+                if (!only.includes(action.kind.split('.', 2)[0])) {
+                  continue
+                }
+              } else if (!context.only.includes(action.kind)) {
                 continue
               }
             }

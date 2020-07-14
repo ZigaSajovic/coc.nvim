@@ -65,7 +65,7 @@ export class ListManager implements Disposable {
       if (this.isActivated) nvim.command('redraw!', true)
     }, null, this.disposables)
     events.on('InputChar', this.onInputChar, this, this.disposables)
-    events.on('FocusGained', debounce(async () => {
+    events.on('FocusGained', debounce(() => {
       if (this.activated) this.prompt.drawPrompt()
     }, 100), null, this.disposables)
     events.on('BufEnter', debounce(async () => {
@@ -86,29 +86,35 @@ export class ListManager implements Disposable {
     }, 100), null, this.disposables)
     this.ui.onDidChangeLine(debounce(async () => {
       if (!this.activated) return
-      let previewing = await nvim.call('coc#util#has_preview')
-      let mode = await this.nvim.mode
-      if (mode.blocking || mode.mode != 'n') return
+      let [previewing, mode] = await nvim.eval('[coc#util#has_preview(),mode()]') as [number, string]
+      if (!previewing || mode != 'n') return
       if (previewing) await this.doAction('preview')
-    }, 100), null, this.disposables)
+    }, 50), null, this.disposables)
     this.ui.onDidLineChange(debounce(async () => {
+      if (!this.activated) return
       let { autoPreview } = this.listOptions
-      if (!autoPreview || !this.activated) return
+      if (!autoPreview) {
+        let [previewing, mode] = await nvim.eval('[coc#util#has_preview(),mode()]') as [number, string]
+        if (!previewing || mode != 'n') return
+      }
       await this.doAction('preview')
-    }, 100), null, this.disposables)
+    }, 50), null, this.disposables)
     this.ui.onDidChangeLine(this.resolveItem, this, this.disposables)
     this.ui.onDidLineChange(this.resolveItem, this, this.disposables)
-    this.ui.onDidOpen(() => {
+    this.ui.onDidOpen(async () => {
       if (this.currList) {
         if (typeof this.currList.doHighlight == 'function') {
           this.currList.doHighlight()
+        }
+        if (this.listOptions.first) {
+          await this.doAction()
         }
       }
     }, null, this.disposables)
     this.ui.onDidClose(async () => {
       await this.cancel()
     }, null, this.disposables)
-    this.ui.onDidChange(async () => {
+    this.ui.onDidChange(() => {
       if (this.activated) {
         this.updateStatus()
       }
@@ -145,7 +151,9 @@ export class ListManager implements Disposable {
   }
 
   public async start(args: string[]): Promise<void> {
-    if (this.activated) return
+    if (this.activated) {
+      await this.cancel(true)
+    }
     let res = this.parseArgs(args)
     if (!res) return
     this.args = args
@@ -203,6 +211,24 @@ export class ListManager implements Disposable {
     if (items.length) await this.doItemAction(items, action)
   }
 
+  public async first(): Promise<void> {
+    let { ui } = this
+    let item = this.ui.firstItem
+    if (!item) return
+    ui.index = 0
+    await this.doItemAction([item], this.defaultAction)
+    await ui.echoMessage(item)
+  }
+
+  public async last(): Promise<void> {
+    let { ui } = this
+    let item = this.ui.lastItem
+    if (!item) return
+    ui.index = this.ui.length - 1
+    await this.doItemAction([item], this.defaultAction)
+    await ui.echoMessage(item)
+  }
+
   public async previous(): Promise<void> {
     let { ui } = this
     let item = ui.getItem(-1)
@@ -222,9 +248,9 @@ export class ListManager implements Disposable {
   }
 
   public async cancel(close = true): Promise<void> {
-    let { nvim, ui, savedHeight } = this
+    let { nvim, ui, savedHeight, window } = this
     if (!this.activated) {
-      nvim.call('coc#list#stop_prompt', [], true)
+      await nvim.call('coc#list#stop_prompt', [])
       return
     }
     this.activated = false
@@ -235,14 +261,15 @@ export class ListManager implements Disposable {
     this.prompt.cancel()
     if (close) {
       ui.hide()
-      if (this.window) {
-        nvim.call('coc#list#restore', [this.window.id, savedHeight], true)
+      if (window) {
+        nvim.call('coc#list#restore', [window.id, savedHeight], true)
       }
     }
+    nvim.command('redraw', true)
     await nvim.resumeNotification()
   }
 
-  public async switchMatcher(): Promise<void> {
+  public switchMatcher(): void {
     let { matcher, interactive } = this.listOptions
     if (interactive) return
     const list: Matcher[] = ['fuzzy', 'strict', 'regex']
@@ -250,7 +277,7 @@ export class ListManager implements Disposable {
     if (idx >= list.length) idx = 0
     this.listOptions.matcher = list[idx]
     this.prompt.matcher = list[idx]
-    await this.worker.drawItems()
+    this.worker.drawItems()
   }
 
   public async togglePreview(): Promise<void> {
@@ -276,6 +303,7 @@ export class ListManager implements Disposable {
     }
     let shortcuts: Set<string> = new Set()
     let choices: string[] = []
+    let invalids: string[] = []
     for (let name of names) {
       let i = 0
       for (let ch of name) {
@@ -286,6 +314,13 @@ export class ListManager implements Disposable {
         }
         i++
       }
+      if (i == name.length) {
+        invalids.push(name)
+      }
+    }
+    if (invalids.length) {
+      logger.error(`Can't create shortcut for actions: ${invalids.join(',')} of "${currList.name}" list`)
+      names = names.filter(s => !invalids.includes(s))
     }
     await nvim.call('coc#list#stop_prompt')
     let n = await nvim.call('confirm', ['Choose action:', choices.join('\n')]) as number
@@ -303,17 +338,20 @@ export class ListManager implements Disposable {
     return this.currList
   }
 
-  public parseArgs(args: string[]): { list: IList, options: ListOptions, listArgs: string[] } | null {
+  public parseArgs(args: string[]): { list: IList; options: ListOptions; listArgs: string[] } | null {
     let options: string[] = []
     let interactive = false
     let autoPreview = false
     let numberSelect = false
+    let noQuit = false
+    let first = false
     let name: string
     let input = ''
     let matcher: Matcher = 'fuzzy'
     let position = 'bottom'
     let listArgs: string[] = []
     let listOptions: string[] = []
+    let noResize = false
     for (let arg of args) {
       if (!name && arg.startsWith('-')) {
         listOptions.push(arg)
@@ -350,6 +388,12 @@ export class ListManager implements Disposable {
         position = 'tab'
       } else if (opt == '--ignore-case' || opt == '--normal' || opt == '--no-sort') {
         options.push(opt.slice(2))
+      } else if (opt == '--first') {
+        first = true
+      } else if (opt == '--no-quit') {
+        noQuit = true
+      } else if (opt == '--no-resize') {
+        noResize = true
       } else {
         workspace.showMessage(`Invalid option "${opt}" of list`, 'error')
         return null
@@ -370,13 +414,16 @@ export class ListManager implements Disposable {
       options: {
         numberSelect,
         autoPreview,
+        noResize,
+        noQuit,
+        first,
         input,
         interactive,
         matcher,
         position,
-        ignorecase: options.indexOf('ignore-case') != -1 ? true : false,
-        mode: options.indexOf('normal') == -1 ? 'insert' : 'normal',
-        sort: options.indexOf('no-sort') == -1 ? true : false
+        ignorecase: options.includes('ignore-case') ? true : false,
+        mode: !options.includes('normal') ? 'insert' : 'normal',
+        sort: !options.includes('no-sort') ? true : false
       },
     }
   }
@@ -428,7 +475,7 @@ export class ListManager implements Disposable {
   private async onInsertInput(ch: string, charmod: number): Promise<void> {
     let { nvim } = this
     let inserted = this.charMap.get(ch) || ch
-    if (mouseKeys.indexOf(inserted) !== -1) {
+    if (mouseKeys.includes(inserted)) {
       await this.onMouseEvent(inserted)
       return
     }
@@ -451,7 +498,7 @@ export class ListManager implements Disposable {
     for (let s of ch) {
       let code = s.codePointAt(0)
       if (code == 65533) return
-      // exclude control characer
+      // exclude control character
       if (code < 32 || code >= 127 && code <= 159) return
       await this.prompt.acceptCharacter(s)
     }
@@ -459,7 +506,7 @@ export class ListManager implements Disposable {
 
   private async onNormalInput(ch: string, _charmod: number): Promise<void> {
     let inserted = this.charMap.get(ch) || ch
-    if (mouseKeys.indexOf(inserted) !== -1) {
+    if (mouseKeys.includes(inserted)) {
       await this.onMouseEvent(inserted)
       return
     }
@@ -628,7 +675,7 @@ export class ListManager implements Disposable {
         type: 'string',
         enum: ['--top', '--normal', '--no-sort', '--input', '--tab',
           '--strict', '--regex', '--ignore-case', '--number-select',
-          '--interactive', '--auto-preview']
+          '--interactive', '--auto-preview', '--first', '--no-quit', '--no-resize']
       }
     })
     extensions.addSchemeProperty(`list.source.${name}.defaultArgs`, {
@@ -695,46 +742,42 @@ export class ListManager implements Disposable {
 
   private async doItemAction(items: ListItem[], action: ListAction): Promise<void> {
     if (this.executing) return
-    this.executing = true
+    let { noQuit } = this.listOptions
     let { nvim } = this
-    let shouldCancel = action.persist !== true && action.name != 'preview'
+    this.executing = true
+    let persist = this.isActivated && (action.persist === true || action.name == 'preview')
+    noQuit = noQuit && this.isActivated
     try {
-      if (shouldCancel) {
-        await this.cancel()
-      } else if (action.name != 'preview') {
-        await nvim.call('coc#list#stop_prompt')
+      if (!persist) {
+        if (noQuit) {
+          nvim.pauseNotification()
+          nvim.call('coc#list#stop_prompt', [], true)
+          nvim.call('win_gotoid', [this.context.window.id], true)
+          await nvim.resumeNotification()
+        } else {
+          await this.cancel()
+        }
       }
-      if (!shouldCancel && !this.isActivated) return
       if (action.multiple) {
         await Promise.resolve(action.execute(items, this.context))
       } else if (action.parallel) {
-        await Promise.all(items.map(item => {
-          return Promise.resolve(action.execute(item, this.context))
-        }))
+        await Promise.all(items.map(item => Promise.resolve(action.execute(item, this.context))))
       } else {
         for (let item of items) {
           await Promise.resolve(action.execute(item, this.context))
         }
       }
-      if (!shouldCancel) {
-        if (!this.isActivated) {
-          this.nvim.command('pclose', true)
-          return
-        }
+      if (persist) {
         nvim.pauseNotification()
-        if (action.name != 'preview') {
-          this.prompt.start()
-        }
+        this.prompt.start()
         this.ui.restoreWindow()
-        nvim.resumeNotification(false, true).logError()
+        await nvim.resumeNotification()
+        if (action.reload) await this.worker.loadItems(true)
+      } else if (noQuit) {
         if (action.reload) await this.worker.loadItems(true)
       }
     } catch (e) {
-      // tslint:disable-next-line: no-console
       console.error(e)
-      if (!shouldCancel && this.activated) {
-        this.prompt.start()
-      }
     }
     this.executing = false
   }
@@ -755,8 +798,10 @@ export class ListManager implements Disposable {
 
   private get defaultAction(): ListAction {
     let { currList } = this
-    let { defaultAction } = currList
-    return currList.actions.find(o => o.name == defaultAction)
+    let { defaultAction, actions } = currList
+    let action = actions.find(o => o.name == defaultAction)
+    if (!action) throw new Error(`default action "${defaultAction}" not found`)
+    return action
   }
 }
 

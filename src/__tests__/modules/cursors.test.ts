@@ -34,8 +34,9 @@ describe('cursors#select', () => {
     let doc = await helper.createDocument()
     await nvim.call('setline', [1, ['a', 'b']])
     await nvim.call('cursor', [1, 1])
-    await helper.wait(30)
+    await helper.wait(100)
     doc.forceSync()
+    await helper.wait(100)
     await cursors.select(doc.bufnr, 'position', 'n')
     await helper.wait(30)
     let n = rangeCount()
@@ -246,7 +247,7 @@ describe('cursors#onchange', () => {
 
   it('should remove text middle', async () => {
     let doc = await setup()
-    await nvim.call('cursor', [1, 2])
+    await nvim.call('cursor', [2, 2])
     await nvim.command('normal! x')
     doc.forceSync()
     await helper.wait(100)
@@ -258,7 +259,7 @@ describe('cursors#onchange', () => {
     let doc = await setup()
     await nvim.call('cursor', [1, 3])
     await nvim.command('normal! x')
-    doc.forceSync(false)
+    doc.forceSync()
     await helper.wait(100)
     let lines = await nvim.call('getline', [1, '$'])
     expect(lines).toEqual(['fo fo fo', 'ba ba'])

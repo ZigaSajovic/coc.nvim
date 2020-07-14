@@ -2,7 +2,6 @@ import { exec, ExecOptions } from 'child_process'
 import debounce from 'debounce'
 import fs from 'fs'
 import isuri from 'isuri'
-import mkdir from 'mkdirp'
 import path from 'path'
 import { Disposable, TextDocumentIdentifier } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
@@ -12,6 +11,8 @@ import * as platform from './platform'
 
 export { platform }
 const logger = require('./logger')('util-index')
+
+export const CONFIG_FILE_NAME = 'coc-settings.json'
 
 export function escapeSingleQuote(str: string): string {
   return str.replace(/'/g, "''")
@@ -86,11 +87,12 @@ export function watchFile(filepath: string, onChange: () => void): Disposable {
       callback()
     })
     return Disposable.create(() => {
+      callback.clear()
       watcher.close()
     })
   } catch (e) {
     return Disposable.create(() => {
-      // noop
+      callback.clear()
     })
   }
 }
@@ -112,15 +114,6 @@ export function getKeymapModifier(mode: MapMode): string {
   return ''
 }
 
-export async function mkdirp(path: string, mode?: number): Promise<boolean> {
-  return new Promise(resolve => {
-    mkdir(path, { mode }, err => {
-      if (err) return resolve(false)
-      resolve(true)
-    })
-  })
-}
-
 // consider textDocument without version to be valid
 export function isDocumentEdit(edit: any): boolean {
   if (edit == null) return false
@@ -129,21 +122,27 @@ export function isDocumentEdit(edit: any): boolean {
   return true
 }
 
-export function concurrent(fns: (() => Promise<any>)[], limit = Infinity): Promise<any[]> {
-  if (fns.length == 0) return Promise.resolve([])
-  return new Promise((resolve, rejrect) => {
-    let remain = fns.slice()
-    let results = []
-    let next = () => {
-      if (remain.length == 0) {
-        return resolve(results)
+export function concurrent<T>(arr: T[], fn: (val: T) => Promise<void>, limit = 3): Promise<void> {
+  if (arr.length == 0) return Promise.resolve()
+  let finished = 0
+  let total = arr.length
+  let remain = arr.slice()
+  return new Promise(resolve => {
+    let run = (val): void => {
+      let cb = () => {
+        finished = finished + 1
+        if (finished == total) {
+          resolve()
+        } else if (remain.length) {
+          let next = remain.shift()
+          run(next)
+        }
       }
-      let list = remain.splice(0, limit)
-      Promise.all(list.map(fn => fn())).then(res => {
-        results.push(...res)
-        next()
-      }, rejrect)
+      fn(val).then(cb, cb)
     }
-    next()
+    for (let i = 0; i < Math.min(limit, remain.length); i++) {
+      let val = remain.shift()
+      run(val)
+    }
   })
 }

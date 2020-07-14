@@ -1,15 +1,20 @@
 import { TextEdit } from 'vscode-languageserver-types'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { diffLines, getChange, patchLine } from '../../util/diff'
+import { ChangedLines } from '../../types'
 
 describe('diff lines', () => {
+  function diff(oldStr: string, newStr: string): ChangedLines {
+    return diffLines(oldStr.split('\n'), newStr.split('\n'))
+  }
+
   it('should diff changed lines', () => {
-    let res = diffLines('a\n', 'b\n')
+    let res = diff('a\n', 'b\n')
     expect(res).toEqual({ start: 0, end: 1, replacement: ['b'] })
   })
 
   it('should diff added lines', () => {
-    let res = diffLines('a\n', 'a\nb\n')
+    let res = diff('a\n', 'a\nb\n')
     expect(res).toEqual({
       start: 1,
       end: 1,
@@ -18,7 +23,7 @@ describe('diff lines', () => {
   })
 
   it('should diff remove lines', () => {
-    let res = diffLines('a\n\n', 'a\n')
+    let res = diff('a\n\n', 'a\n')
     expect(res).toEqual({
       start: 2,
       end: 3,
@@ -27,7 +32,7 @@ describe('diff lines', () => {
   })
 
   it('should diff remove multiple lines', () => {
-    let res = diffLines('a\n\n\n', 'a\n')
+    let res = diff('a\n\n\n', 'a\n')
     expect(res).toEqual({
       start: 2,
       end: 4,
@@ -36,7 +41,7 @@ describe('diff lines', () => {
   })
 
   it('should diff removed line', () => {
-    let res = diffLines('a\n\n\nb', 'a\n\nb')
+    let res = diff('a\n\n\nb', 'a\n\nb')
     expect(res).toEqual({
       start: 2,
       end: 3,
@@ -132,6 +137,13 @@ describe('should get text edits', () => {
 
   it('should get diff for remove #2', () => {
     applyEdits('  ', ' ')
+  })
+
+  it('should prefer cursor position for change', async () => {
+    let res = getChange(' int n', ' n', 0)
+    expect(res).toEqual({ start: 1, end: 5, newText: '' })
+    res = getChange(' int n', ' n')
+    expect(res).toEqual({ start: 0, end: 4, newText: '' })
   })
 
   it('should prefer next line for change', async () => {

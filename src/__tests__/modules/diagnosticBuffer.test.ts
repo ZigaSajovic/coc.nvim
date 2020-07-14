@@ -3,11 +3,9 @@ import { Neovim } from '@chemzqm/neovim'
 import { DiagnosticBuffer } from '../../diagnostic/buffer'
 import { DiagnosticConfig } from '../../diagnostic/manager'
 import { Range, DiagnosticSeverity, Diagnostic } from 'vscode-languageserver-types'
-import { wait } from '../../util'
 
 let nvim: Neovim
 const config: DiagnosticConfig = {
-  joinMessageLines: false,
   checkCurrentLine: false,
   enableSign: true,
   enableHighlightLineNumber: true,
@@ -19,13 +17,13 @@ const config: DiagnosticConfig = {
   refreshOnInsertMode: false,
   virtualTextSrcId: 0,
   virtualText: false,
+  virtualTextCurrentLineOnly: true,
   virtualTextPrefix: " ",
   virtualTextLines: 3,
   virtualTextLineSeparator: " \\ ",
   displayByAle: false,
   srcId: 1000,
   level: DiagnosticSeverity.Hint,
-  locationlist: true,
   signOffset: 1000,
   errorSign: '>>',
   warningSign: '>>',
@@ -39,7 +37,7 @@ const config: DiagnosticConfig = {
 
 async function createDiagnosticBuffer(): Promise<DiagnosticBuffer> {
   let doc = await helper.createDocument()
-  return new DiagnosticBuffer(doc.bufnr, config)
+  return new DiagnosticBuffer(doc.bufnr, doc.uri, config)
 }
 
 function createDiagnostic(msg: string, range?: Range, severity?: DiagnosticSeverity): Diagnostic {
@@ -62,15 +60,6 @@ afterEach(async () => {
 
 describe('diagnostic buffer', () => {
 
-  it('should set locationlist', async () => {
-    let diagnostic = createDiagnostic('foo')
-    let buf = await createDiagnosticBuffer()
-    let winid = await nvim.call('bufwinid', buf.bufnr) as number
-    buf.setLocationlist([diagnostic], winid)
-    let curr = await nvim.call('getloclist', [winid, { title: 1 }])
-    expect(curr.title).toBe('Diagnostics of coc')
-  })
-
   it('should check signs', async () => {
     let buf = await createDiagnosticBuffer()
     await nvim.setLine('foo')
@@ -79,7 +68,7 @@ describe('diagnostic buffer', () => {
     await buf.checkSigns()
     let content = await nvim.call('execute', [`sign place buffer=${buf.bufnr}`])
     let lines: string[] = content.split('\n')
-    let line = lines.find(s => s.indexOf('CocError') != -1)
+    let line = lines.find(s => s.includes('CocError'))
     expect(line).toBeUndefined()
   })
 
@@ -90,7 +79,7 @@ describe('diagnostic buffer', () => {
     await helper.wait(30)
     let content = await nvim.call('execute', [`sign place buffer=${buf.bufnr}`])
     let lines: string[] = content.split('\n')
-    let line = lines.find(s => s.indexOf('CocError') != -1)
+    let line = lines.find(s => s.includes('CocError'))
     expect(line).toBeDefined()
   })
 
@@ -103,7 +92,7 @@ describe('diagnostic buffer', () => {
       createDiagnostic('bar', r, DiagnosticSeverity.Information)
     ]
     let buf = await createDiagnosticBuffer()
-    buf.setDiagnosticInfo(buf.bufnr, diagnostics)
+    buf.setDiagnosticInfo(diagnostics)
     let buffer = await nvim.buffer
     let res = await buffer.getVar('coc_diagnostic_info')
     expect(res).toEqual({
@@ -118,10 +107,8 @@ describe('diagnostic buffer', () => {
   it('should add highlight neovim', async () => {
     let diagnostic = createDiagnostic('foo')
     let buf = await createDiagnosticBuffer()
-    let winid = await nvim.call('bufwinid', buf.bufnr) as number
-    buf.addHighlight([diagnostic], winid)
-    await wait(100)
-    expect(buf.matchIds.size).toBeGreaterThan(0)
+    buf.addHighlight([diagnostic], buf.bufnr)
+    expect(buf.hasHighlights()).toBe(true)
   })
 
   it('should clear all diagnostics', async () => {
@@ -133,7 +120,7 @@ describe('diagnostic buffer', () => {
     await buf.clear()
     let content = await nvim.call('execute', [`sign place buffer=${buf.bufnr}`])
     let lines: string[] = content.split('\n')
-    let line = lines.find(s => s.indexOf('CocError') != -1)
+    let line = lines.find(s => s.includes('CocError'))
     expect(line).toBeUndefined()
     await helper.wait(50)
     let buffer = await nvim.buffer

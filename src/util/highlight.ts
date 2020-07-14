@@ -1,14 +1,14 @@
 import { attach, NeovimClient } from '@chemzqm/neovim'
 import * as cp from 'child_process'
 import { createHash } from 'crypto'
-import workspace from '../workspace'
-import path from 'path'
-import { omit } from './lodash'
-import os from 'os'
 import fs from 'fs'
-import { byteLength } from './string'
+import os from 'os'
+import path from 'path'
+import { v4 as uuid } from 'uuid'
+import workspace from '../workspace'
+import { omit } from './lodash'
 import { terminate } from './processes'
-import uuid = require('uuid/v4')
+import { byteLength } from './string'
 const logger = require('./logger')('util-highlights')
 
 export interface Highlight {
@@ -28,7 +28,7 @@ interface Env {
   runtimepath: string
 }
 
-const diagnosticFiletypes = ['Error', 'Warning', 'Info', 'Hint']
+export const diagnosticFiletypes = ['Error', 'Warning', 'Info', 'Hint']
 const cache: { [hash: string]: Highlight[] } = {}
 let env: Env = null
 
@@ -36,15 +36,13 @@ let env: Env = null
 export function getHiglights(lines: string[], filetype: string, timeout = 500): Promise<Highlight[]> {
   const hlMap: Map<number, string> = new Map()
   const content = lines.join('\n')
-  if (diagnosticFiletypes.indexOf(filetype) != -1) {
-    let highlights = lines.map((line, i) => {
-      return {
-        line: i,
-        colStart: 0,
-        colEnd: byteLength(line),
-        hlGroup: `Coc${filetype}Float`
-      }
-    })
+  if (diagnosticFiletypes.includes(filetype)) {
+    let highlights = lines.map((line, i) => ({
+      line: i,
+      colStart: 0,
+      colEnd: byteLength(line),
+      hlGroup: `Coc${filetype}Float`
+    }))
     return Promise.resolve(highlights)
   }
   if (filetype == 'javascriptreact') {
@@ -53,9 +51,7 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
   if (filetype == 'typescriptreact') {
     filetype = 'typescript'
   }
-  let maxBytes = lines.reduce((p, c) => {
-    return Math.max(p, byteLength(c))
-  }, 0)
+  let maxBytes = lines.reduce((p, c) => Math.max(p, byteLength(c)), 0)
   const id = createHash('md5').update(content).digest('hex')
   if (cache[id]) return Promise.resolve(cache[id])
   if (workspace.env.isVim) return Promise.resolve([])
@@ -134,7 +130,6 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
                 let colStart = 0
                 let hlGroup = ''
                 let currId = 0
-                // tslint:disable-next-line: prefer-for-of
                 for (let i = 0; i < cells.length; i++) {
                   let cell = cells[i]
                   let [ch, hlId, repeat] = cell as [string, number?, number?]
@@ -178,7 +173,7 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
       await nvim.callAtomic([
         ['nvim_set_option', ['runtimepath', env.runtimepath]],
         ['nvim_command', [`highlight! link Normal CocFloating`]],
-        ['nvim_command', [`runtime syntax/${filetype}.vim`]],
+        ['nvim_command', ['syntax enable']],
         ['nvim_command', [`colorscheme ${env.colorscheme || 'default'}`]],
         ['nvim_command', [`set background=${env.background}`]],
         ['nvim_command', ['set nowrap']],
@@ -186,11 +181,11 @@ export function getHiglights(lines: string[], filetype: string, timeout = 500): 
         ['nvim_command', ['set nobackup']],
         ['nvim_command', ['set noshowmode']],
         ['nvim_command', ['set noruler']],
+        ['nvim_command', ['set undolevels=-1']],
         ['nvim_command', ['set laststatus=0']],
+        ...lines.map((line, idx) => ['nvim_call_function', ['setline', [idx + 1, line]]]) as any,
+        ['nvim_command', [`runtime! syntax/${filetype}.vim`]]
       ])
-      let buf = await nvim.buffer
-      await buf.setLines(lines, { start: 0, end: -1, strictIndexing: false })
-      await buf.setOption('filetype', filetype)
       await nvim.uiAttach(maxBytes + 10, lines.length + 1, {
         ext_hlstate: true,
         ext_linegrid: true

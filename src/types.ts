@@ -1,15 +1,15 @@
-import { Neovim, Window, Buffer } from '@chemzqm/neovim'
-import { RequestOptions } from 'http'
+import {Neovim, Window, Buffer} from '@chemzqm/neovim'
 import log4js from 'log4js'
-import { CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder } from 'vscode-languageserver-protocol'
-import { TextDocument } from 'vscode-languageserver-textdocument'
-import { URI } from 'vscode-uri'
+import {CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder} from 'vscode-languageserver-protocol'
+import {TextDocument} from 'vscode-languageserver-textdocument'
+import {URI} from 'vscode-uri'
 import Configurations from './configuration'
-import { LanguageClient } from './language-client'
+import {LanguageClient} from './language-client'
 import Document from './model/document'
 import FileSystemWatcher from './model/fileSystemWatcher'
-import { ProviderResult, TextDocumentContentProvider } from './provider'
+import {ProviderResult, TextDocumentContentProvider} from './provider'
 import * as protocol from 'vscode-languageserver-protocol'
+import {ParsedUrlQueryInput} from 'querystring'
 
 export type MsgTypes = 'error' | 'warning' | 'more'
 export type ExtensionState = 'disabled' | 'loaded' | 'activated' | 'unknown'
@@ -61,6 +61,16 @@ export interface Autocmd {
   callback: Function
 }
 
+export interface ExtensionJson {
+  name: string
+  main?: string
+  engines: {
+    [key: string]: string
+  }
+  version?: string
+  [key: string]: any
+}
+
 export interface ExtensionInfo {
   id: string
   version: string
@@ -70,6 +80,7 @@ export interface ExtensionInfo {
   uri?: string
   state: ExtensionState
   isLocal: boolean
+  packageJSON: Readonly<ExtensionJson>
 }
 
 export interface ErrorItem {
@@ -141,7 +152,7 @@ export interface TerminalOptions {
   /**
    * Object with environment variables that will be added to the VS Code process.
    */
-  env?: { [key: string]: string | null }
+  env?: {[key: string]: string | null}
 
   /**
    * Whether the terminal process environment should be exactly as provided in
@@ -238,6 +249,7 @@ export interface Terminal {
 export interface Env {
   completeOpt: string
   runtimepath: string
+  disabledSources: {[filetype: string]: string[]}
   readonly guicursor: string
   readonly mode: string
   readonly floating: boolean
@@ -251,7 +263,7 @@ export interface Env {
   readonly lines: number
   readonly pumevent: boolean
   readonly cmdheight: number
-  readonly filetypeMap: { [index: string]: string }
+  readonly filetypeMap: {[index: string]: string}
   readonly isVim: boolean
   readonly isCygwin: boolean
   readonly isMacvim: boolean
@@ -260,6 +272,13 @@ export interface Env {
   readonly locationlist: boolean
   readonly progpath: string
   readonly textprop: boolean
+  readonly vimCommands: CommandConfig[]
+}
+
+export interface CommandConfig {
+  id: string
+  cmd: string
+  title?: string
 }
 
 export interface Fragment {
@@ -296,6 +315,13 @@ export enum PatternType {
   Buffer,
   LanguageServer,
   Global,
+}
+
+export enum ExtensionType {
+  Global,
+  Local,
+  SingleFile,
+  Internal
 }
 
 export enum SourceType {
@@ -337,12 +363,13 @@ export interface LanguageServerConfig {
   transport?: string
   transportPort?: number
   disableWorkspaceFolders?: boolean
+  disableSnippetCompletion?: boolean
   disableDynamicRegister?: boolean
   disableCompletion?: boolean
   disableDiagnostics?: boolean
   filetypes: string[]
   additionalSchemes: string[]
-  enable: boolean
+  enable?: boolean
   args?: string[]
   cwd?: string
   env?: any
@@ -375,7 +402,7 @@ export interface QuickfixItem {
   module?: string
   range?: Range
   text?: string
-  type?: string,
+  type?: string
   filename?: string
   bufnr?: number
   lnum?: number
@@ -399,7 +426,9 @@ export interface ChangeItem {
 export interface BufferOption {
   eol: number
   size: number
-  variables: { [key: string]: any }
+  winid: number
+  previewwindow: boolean
+  variables: {[key: string]: any}
   bufname: string
   fullpath: string
   buftype: string
@@ -462,7 +491,15 @@ export interface CompleteOption {
   readonly synname: string
   readonly source?: string
   readonly blacklist: string[]
+  readonly changedtick: number
   triggerForInComplete?: boolean
+}
+
+export interface InsertChange {
+  lnum: number
+  col: number
+  pre: string
+  changedtick: number
 }
 
 export interface PumBounding {
@@ -554,7 +591,7 @@ export interface PopupOptions {
 }
 
 export interface PopupChangeEvent {
-  completed_item: VimCompleteItem,
+  completed_item: VimCompleteItem
   height: number
   width: number
   row: number
@@ -574,6 +611,7 @@ export interface CompleteResult {
 export interface SourceStat {
   name: string
   priority: number
+  triggerCharacters: string[]
   type: string
   shortcut: string
   filepath: string
@@ -591,6 +629,7 @@ export interface CompleteConfig {
   maxPreviewWidth: number
   autoTrigger: string
   previewIsKeyword: string
+  triggerCompletionWait: number
   minTriggerInputLength: number
   triggerAfterInsertEnter: boolean
   acceptSuggestionOnCommitCharacter: boolean
@@ -795,6 +834,9 @@ export interface ListOptions {
   matcher: Matcher
   autoPreview: boolean
   numberSelect: boolean
+  noQuit: boolean
+  noResize: boolean
+  first: boolean
 }
 
 export interface ListContext {
@@ -882,10 +924,22 @@ export interface PreiewOptions {
   lnum?: number
 }
 
-export interface DownloadOptions extends RequestOptions {
+export interface FetchOptions {
+  method?: string
+  timeout?: number
+  // use object literal for json formated data
+  data?: string | {[key: string]: any} | Buffer
+  query?: ParsedUrlQueryInput
+  headers?: any
+  user?: string
+  password?: string
+}
+
+export interface DownloadOptions extends FetchOptions {
   // absolute folder path
   dest: string
-  onProgress?: (percent: number) => void
+  extract?: boolean
+  onProgress?: (percent: string) => void
 }
 
 export interface AnsiItem {
@@ -1097,7 +1151,8 @@ export interface TextDocumentWillSaveEvent {
 
 export interface Thenable<T> {
   then<TResult>(onfulfilled?: (value: T) => TResult | Thenable<TResult>, onrejected?: (reason: any) => TResult | Thenable<TResult>): Thenable<TResult>
-  then<TResult>(onfulfilled?: (value: T) => TResult | Thenable<TResult>, onrejected?: (reason: any) => void): Thenable<TResult> // tslint:disable-line
+  // eslint-disable-next-line @typescript-eslint/unified-signatures
+  then<TResult>(onfulfilled?: (value: T) => TResult | Thenable<TResult>, onrejected?: (reason: any) => void): Thenable<TResult>
 }
 
 /**

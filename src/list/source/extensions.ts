@@ -23,9 +23,9 @@ export default class ExtensionList extends BasicList {
       let { id, state } = item.data
       if (state == 'disabled') return
       if (state == 'activated') {
-        extensions.deactivate(id)
+        await extensions.deactivate(id)
       } else {
-        extensions.activate(id)
+        await extensions.activate(id)
       }
       await wait(100)
     }, { persist: true, reload: true, parallel: true })
@@ -35,7 +35,7 @@ export default class ExtensionList extends BasicList {
       let jsonFile = path.join(root, 'package.json')
       if (fs.existsSync(jsonFile)) {
         let lines = fs.readFileSync(jsonFile, 'utf8').split(/\r?\n/)
-        let idx = lines.findIndex(s => s.indexOf('"contributes"') !== -1)
+        let idx = lines.findIndex(s => s.includes('"contributes"'))
         await workspace.jumpTo(URI.file(jsonFile).toString(), { line: idx == -1 ? 0 : idx, character: 0 })
       }
     })
@@ -64,7 +64,7 @@ export default class ExtensionList extends BasicList {
       await extensions.toggleLock(id)
     }, { persist: true, reload: true })
 
-    this.addAction('doc', async item => {
+    this.addAction('readme', async item => {
       let { root } = item.data
       let files = await readdirAsync(root)
       let file = files.find(f => /^readme/i.test(f))
@@ -75,18 +75,17 @@ export default class ExtensionList extends BasicList {
     })
 
     this.addAction('reload', async item => {
-      let { id, state } = item.data
-      if (state == 'disabled') return
-      if (state == 'activated') {
-        extensions.deactivate(id)
-      }
-      extensions.activate(id)
-      await wait(100)
+      let { id } = item.data
+      await extensions.reloadExtension(id)
     }, { persist: true, reload: true })
 
     this.addAction('fix', async item => {
-      let { root } = item.data
+      let { root, isLocal } = item.data
       let { npm } = extensions
+      if (isLocal) {
+        workspace.showMessage(`Can't fix for local extension.`, 'warning')
+        return
+      }
       if (!npm) return
       let folder = path.join(root, 'node_modules')
       if (fs.existsSync(folder)) {
@@ -127,7 +126,7 @@ export default class ExtensionList extends BasicList {
         prefix = '?'
       }
       let root = await this.nvim.call('resolve', stat.root)
-      let locked = lockedList.indexOf(stat.id) !== -1
+      let locked = lockedList.includes(stat.id)
       items.push({
         label: `${prefix} ${stat.id}${locked ? ' ' : ''}\t${stat.isLocal ? '[RTP]\t' : ''}${stat.version}\t${root.replace(os.homedir(), '~')}`,
         filterText: stat.id,
